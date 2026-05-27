@@ -10,7 +10,7 @@ const ChatBox = ({ conversationId: adminConversationId }) => {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
   const [error, setError] = useState('');
-  const bottomRef = useRef(null);
+  const messagesRef = useRef(null);
 
   const load = useCallback(async (showError = true) => {
     try {
@@ -29,7 +29,10 @@ const ChatBox = ({ conversationId: adminConversationId }) => {
     const timer = setInterval(() => load(false), 2500);
     return () => clearInterval(timer);
   }, [load]);
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => {
+    const element = messagesRef.current;
+    if (element) element.scrollTop = element.scrollHeight;
+  }, [messages]);
 
   const submit = async (event) => {
     event.preventDefault();
@@ -63,7 +66,7 @@ const ChatBox = ({ conversationId: adminConversationId }) => {
         </div>
       </div>
 
-      <div className="messenger-messages">
+      <div className="messenger-messages" ref={messagesRef}>
         {messages.map((message) => {
           const mine = currentUser?.role === 'admin' ? message.senderRole === 'admin' : message.senderRole === 'customer';
           return (
@@ -76,7 +79,6 @@ const ChatBox = ({ conversationId: adminConversationId }) => {
           );
         })}
         {!messages.length && <div className="chat-empty">Chưa có tin nhắn. Hãy gửi câu hỏi cho BuildLab Support.</div>}
-        <div ref={bottomRef} />
       </div>
 
       {error && <div className="alert">{error}</div>}

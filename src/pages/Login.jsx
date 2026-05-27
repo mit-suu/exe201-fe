@@ -18,8 +18,10 @@ const Login = () => {
 
     try {
       const response = await api.post('/auth/login', form);
-      saveSession(response.data.data.user, response.data.data.accessToken);
-      navigate('/dashboard');
+      const loggedInUser = response.data.data.user;
+      saveSession(loggedInUser, response.data.data.accessToken);
+      const isShop = ['lender', 'both'].includes(loggedInUser?.role);
+      navigate(loggedInUser?.role === 'admin' ? '/admin' : isShop ? '/shop/dashboard' : '/');
       window.location.reload();
     } catch (err) {
       setError(err?.response?.data?.message || 'Đăng nhập thất bại');
@@ -27,18 +29,35 @@ const Login = () => {
   };
 
   return (
-    <section className="form-card">
-      <h2>Đăng nhập</h2>
-      <p>Quản lý thông tin thuê đồ hoặc truy cập trang admin khi có quyền.</p>
-      {error && <div className="alert">{error}</div>}
-      <form onSubmit={handleSubmit} className="input-group">
-        <label>Email</label>
-        <input type="email" name="email" value={form.email} onChange={handleChange} required />
-        <label>Mật khẩu</label>
-        <input type="password" name="password" value={form.password} onChange={handleChange} required />
-        <button type="submit" className="primary-button">Đăng nhập</button>
-      </form>
-      <p>Bạn chưa có tài khoản? <Link to="/register">Đăng ký ngay</Link></p>
+    <section className="auth-page">
+      <div className="auth-brand-panel">
+        <span className="logo-mark large" aria-hidden="true"><span className="logo-hanger"></span></span>
+        <p className="eyebrow">BuildLab Costume Rental</p>
+        <h1>Chào mừng bạn quay lại.</h1>
+        <p>Đăng nhập để quản lý đơn thuê, theo dõi sản phẩm yêu thích hoặc truy cập khu vực admin.</p>
+        <div className="auth-highlight-grid">
+          <span>Trang phục đẹp</span>
+          <span>Đặt thuê nhanh</span>
+          <span>Quản trị gọn</span>
+        </div>
+      </div>
+
+      <div className="form-card auth-card">
+        <div className="auth-card-heading">
+          <p className="eyebrow">Đăng nhập</p>
+          <h2>Vào tài khoản</h2>
+          <p>Sử dụng email và mật khẩu đã đăng ký trên BuildLab.</p>
+        </div>
+        {error && <div className="alert">{error}</div>}
+        <form onSubmit={handleSubmit} className="input-group auth-form">
+          <label>Email</label>
+          <input type="email" name="email" placeholder="admin@buildlab.vn" value={form.email} onChange={handleChange} required />
+          <label>Mật khẩu</label>
+          <input type="password" name="password" placeholder="Nhập mật khẩu" value={form.password} onChange={handleChange} required />
+          <button type="submit" className="primary-button">Đăng nhập</button>
+        </form>
+        <p className="auth-switch">Bạn chưa có tài khoản? <Link to="/register">Đăng ký ngay</Link></p>
+      </div>
     </section>
   );
 };
