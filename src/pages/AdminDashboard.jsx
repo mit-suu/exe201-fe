@@ -481,7 +481,7 @@ const AdminDashboard = () => {
                 return (
                   <div className="table-row" style={{ padding: '16px', gridTemplateColumns: 'auto 1fr auto' }} key={p._id}>
                     {p.images && p.images.length > 0 ? (
-                      <img src={p.images[0]} alt={p.name} style={{ width: '54px', height: '54px', borderRadius: '10px', objectFit: 'cover' }} />
+                      <img src={p.images[0]?.url || p.images[0]} alt={p.name} style={{ width: '54px', height: '54px', borderRadius: '10px', objectFit: 'cover' }} />
                     ) : (
                       <div style={{ width: '54px', height: '54px', borderRadius: '10px', background: 'var(--surface-soft)', display: 'grid', placeItems: 'center' }}>👗</div>
                     )}
@@ -610,6 +610,19 @@ const AdminDashboard = () => {
                 />
                 <p style={{ color: 'var(--muted)', fontSize: '0.78rem', marginTop: '4px' }}>
                   Hệ thống tự động trừ phí hoa hồng này từ mỗi đơn hàng thành công của Shop.
+                </p>
+              </div>
+
+              <div>
+                <label style={{ fontWeight: '800', display: 'block', marginBottom: '5px' }}>Hạn mức nợ phí sàn tối đa để khóa Shop (đ)</label>
+                <input 
+                  type="number" 
+                  value={platformConfig.maxDebtLimit !== undefined ? platformConfig.maxDebtLimit : 5000000} 
+                  onChange={(e) => setPlatformConfig({ ...platformConfig, maxDebtLimit: Number(e.target.value) })} 
+                  required 
+                />
+                <p style={{ color: 'var(--muted)', fontSize: '0.78rem', marginTop: '4px' }}>
+                  Nếu ví của Shop bị âm vượt quá hạn mức nợ này (ví dụ: ví có số dư nợ dưới -5.000.000 đ), hệ thống sẽ tự động khóa Shop và ẩn toàn bộ sản phẩm của Shop đó khỏi trang chủ.
                 </p>
               </div>
 
@@ -865,6 +878,23 @@ const AdminDashboard = () => {
                 <p style={{ margin: '6px 0 3px', fontSize: '0.85rem' }}>• <strong>Cọc:</strong> {selectedShop.lenderProfile?.rentalPolicy || 'N/A'}</p>
                 <p style={{ margin: '3px 0 0', fontSize: '0.85rem' }}>• <strong>Phạt:</strong> {selectedShop.lenderProfile?.latePenaltyPolicy || 'N/A'}</p>
               </div>
+              {selectedShop.lenderProfile?.businessLicenseUrl && (
+                <div style={{ marginTop: '10px' }}>
+                  <strong>Giấy phép kinh doanh / CCCD:</strong>
+                  <div style={{ marginTop: '8px', border: '1px solid var(--border)', borderRadius: '14px', overflow: 'hidden', background: 'var(--surface-soft)', textAlign: 'center', padding: '10px' }}>
+                    <img 
+                      src={selectedShop.lenderProfile.businessLicenseUrl} 
+                      alt="Giấy phép kinh doanh / CCCD" 
+                      style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '10px', objectFit: 'contain' }} 
+                    />
+                    <div style={{ marginTop: '8px' }}>
+                      <a href={selectedShop.lenderProfile.businessLicenseUrl} target="_blank" rel="noreferrer" style={{ fontSize: '0.85rem', color: 'var(--accent)', fontWeight: '800', textDecoration: 'underline' }}>
+                        🔍 Xem ảnh kích thước lớn
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', gap: '10px', marginTop: '30px', justifyContent: 'flex-end' }}>
