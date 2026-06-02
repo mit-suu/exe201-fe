@@ -10,14 +10,14 @@ const MyWallet = () => {
   const [wallet, setWallet] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+
   const [bankForm, setBankForm] = useState({ bankName: '', accountNumber: '', accountHolderName: '' });
   const [depositAmount, setDepositAmount] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [qrCode, setQrCode] = useState(null);
   const [orderCode, setOrderCode] = useState('');
   const [pendingTxId, setPendingTxId] = useState(null);
-  
+
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -47,20 +47,20 @@ const MyWallet = () => {
   // Khởi tạo Socket
   useEffect(() => {
     const socket = connectSocket();
-    
+
     if (socket) {
       console.log('Socket initialized in MyWallet!', socket.id);
-      
+
       socket.on('wallet_updated', (data) => {
         console.log('✅✅✅ NHẬN ĐƯỢC SOCKET TỪ BACKEND!', data);
-        
+
         // Cập nhật Wallet
         setWallet(prev => ({
           ...prev,
           balance: data.balance,
           frozenBalance: data.frozenBalance
         }));
-        
+
         // Nếu mã nạp tiền đang mở thì đóng lại
         if (data.status === 'completed') {
           setQrCode(null);
@@ -113,8 +113,8 @@ const MyWallet = () => {
 
   const handleWithdraw = async (e) => {
     e.preventDefault();
-    if (!withdrawAmount || Number(withdrawAmount) < 50000) {
-      return setError('Số tiền rút tối thiểu là 50,000 đ');
+    if (!withdrawAmount || Number(withdrawAmount) < 10000) {
+      return setError('Số tiền rút tối thiểu là 10,000 đ');
     }
     if (!wallet?.bankAccount?.accountNumber) {
       return setError('Vui lòng cập nhật thông tin tài khoản ngân hàng trước khi rút tiền.');
@@ -135,7 +135,7 @@ const MyWallet = () => {
   return (
     <div style={{ maxWidth: '1000px', margin: '40px auto', padding: '0 20px', minHeight: '60vh' }}>
       <h1 style={{ marginBottom: '30px' }}>Ví của tôi (BuildLab Wallet)</h1>
-      
+
       {message && <div className="alert success-alert" style={{ marginBottom: '20px' }}>{message}</div>}
       {error && <div className="alert" style={{ marginBottom: '20px' }}>{error}</div>}
 
@@ -144,7 +144,7 @@ const MyWallet = () => {
         <div className="card" style={{ padding: '30px', background: 'linear-gradient(135deg, var(--primary-strong), var(--accent))', color: 'white', borderRadius: '16px' }}>
           <p style={{ margin: '0 0 10px 0', opacity: 0.9, fontSize: '1.1rem' }}>Số dư khả dụng</p>
           <h2 style={{ fontSize: '2.5rem', margin: 0, fontWeight: 800 }}>{money(wallet?.balance)} đ</h2>
-          
+
           <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '15px' }}>
             <div>
               <p style={{ margin: '0 0 5px 0', fontSize: '0.9rem', opacity: 0.8 }}>Tiền đang đóng băng (Cọc)</p>
@@ -160,13 +160,13 @@ const MyWallet = () => {
         {/* Nạp & Rút tiền */}
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <h3 style={{ margin: 0 }}>Giao dịch nhanh</h3>
-          
+
           <form onSubmit={handleDeposit} style={{ display: 'flex', gap: '10px' }}>
-            <input 
-              type="number" 
-              placeholder="Nhập số tiền nạp..." 
-              value={depositAmount} 
-              onChange={e => setDepositAmount(e.target.value)} 
+            <input
+              type="number"
+              placeholder="Nhập số tiền nạp..."
+              value={depositAmount}
+              onChange={e => setDepositAmount(e.target.value)}
               style={{ flex: 1 }}
             />
             <button type="submit" className="primary-button" style={{ whiteSpace: 'nowrap' }}>Nạp tiền</button>
@@ -175,7 +175,7 @@ const MyWallet = () => {
           {qrCode && (
             <div style={{ textAlign: 'center', background: '#f8fafc', padding: '20px', borderRadius: '12px', border: '1px solid var(--border)' }}>
               <p style={{ fontWeight: 'bold', marginBottom: '15px' }}>Quét mã QR để chuyển khoản</p>
-              
+
               <div style={{ background: 'white', padding: '15px', display: 'inline-block', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}>
                 <QRCodeCanvas value={qrCode} size={220} level="M" />
               </div>
@@ -192,8 +192,8 @@ const MyWallet = () => {
                 Đang chờ thanh toán...
               </p>
 
-              <button 
-                className="button" 
+              <button
+                className="button"
                 style={{ marginTop: '20px', width: '100%' }}
                 onClick={() => { setQrCode(null); setPendingTxId(null); loadWallet(); }}
               >
@@ -203,11 +203,11 @@ const MyWallet = () => {
           )}
 
           <form onSubmit={handleWithdraw} style={{ display: 'flex', gap: '10px', borderTop: '1px solid var(--border)', paddingTop: '20px' }}>
-            <input 
-              type="number" 
-              placeholder="Nhập số tiền rút..." 
-              value={withdrawAmount} 
-              onChange={e => setWithdrawAmount(e.target.value)} 
+            <input
+              type="number"
+              placeholder="Nhập số tiền rút..."
+              value={withdrawAmount}
+              onChange={e => setWithdrawAmount(e.target.value)}
               style={{ flex: 1 }}
             />
             <button type="submit" className="button" style={{ whiteSpace: 'nowrap' }}>Rút tiền</button>
@@ -239,18 +239,18 @@ const MyWallet = () => {
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '5px' }}>Số Tài khoản</label>
-              <input 
-                placeholder="VD: 1029384756" 
-                value={bankForm.accountNumber} 
+              <input
+                placeholder="VD: 1029384756"
+                value={bankForm.accountNumber}
                 onChange={e => setBankForm({ ...bankForm, accountNumber: e.target.value })}
                 required
               />
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '5px' }}>Tên Chủ Tài khoản</label>
-              <input 
-                placeholder="VD: NGUYEN VAN A" 
-                value={bankForm.accountHolderName} 
+              <input
+                placeholder="VD: NGUYEN VAN A"
+                value={bankForm.accountHolderName}
                 onChange={e => setBankForm({ ...bankForm, accountHolderName: e.target.value.toUpperCase() })}
                 required
               />
@@ -280,8 +280,9 @@ const MyWallet = () => {
                     <strong style={{ color: ['deposit', 'refund'].includes(tx.type) ? 'var(--success)' : 'var(--danger)' }}>
                       {['deposit', 'refund'].includes(tx.type) ? '+' : '-'}{money(tx.amount)} đ
                     </strong>
-                    <span style={{ display: 'block', fontSize: '0.75rem', 
-                      color: tx.status === 'completed' ? 'var(--success)' : tx.status === 'pending' ? 'var(--warning)' : 'var(--danger)' 
+                    <span style={{
+                      display: 'block', fontSize: '0.75rem',
+                      color: tx.status === 'completed' ? 'var(--success)' : tx.status === 'pending' ? 'var(--warning)' : 'var(--danger)'
                     }}>
                       {tx.status}
                     </span>

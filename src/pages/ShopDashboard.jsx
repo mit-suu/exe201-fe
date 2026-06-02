@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StatusBadge from '../components/StatusBadge.jsx';
+import api from '../services/api.js';
 import { listShopProducts, createProduct, updateProduct, deleteProduct } from '../services/products.js';
 import { getShopOrders, getShopRevenue, updateOrderStatus } from '../services/orders.js';
 import { getShopReviews, replyToReview } from '../services/reviews.js';
@@ -8,7 +9,9 @@ import { getMyNotifications, markNotificationRead } from '../services/notificati
 import { updateProfile } from '../services/profile.js';
 import { clearSession } from '../services/auth.js';
 import { connectSocket, disconnectSocket } from '../services/socket.js';
-import { getBalance, updateBankAccount, withdrawWallet } from '../services/wallet.js';
+import { getBalance, updateBankAccount, withdrawWallet, depositWallet, getTransactions } from '../services/wallet.js';
+import { QRCodeCanvas } from 'qrcode.react';
+import { getPlatformConfig } from '../services/platform.js';
 import { VIETNAM_BANKS } from '../constants/banks.js';
 import { LayoutDashboard, Shirt, ShoppingBag, BarChart3, Wallet, Store, Star, Bell, LogOut, Download } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -77,14 +80,14 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedOrder, setSelectedOrder] = useState(null);
-  
+
   // Operational Modal States
   const [checkingInOrder, setCheckingInOrder] = useState(null);
   const [checkInImages, setCheckInImages] = useState('');
-  
+
   const [checkingOutOrder, setCheckingOutOrder] = useState(null);
   const [checkOutImages, setCheckOutImages] = useState('');
-  
+
   const [disputingOrder, setDisputingOrder] = useState(null);
   const [disputeReason, setDisputeReason] = useState('');
   const [disputeAmount, setDisputeAmount] = useState(0);
@@ -96,6 +99,12 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
   const [wallet, setWallet] = useState(null);
   const [bankForm, setBankForm] = useState({ bankName: '', accountNumber: '', accountHolderName: '' });
   const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [platformConfig, setPlatformConfig] = useState(null);
+  const [depositAmount, setDepositAmount] = useState('');
+  const [qrCode, setQrCode] = useState(null);
+  const [orderCode, setOrderCode] = useState('');
+  const [pendingTxId, setPendingTxId] = useState(null);
+  const [transactions, setTransactions] = useState([]);
 
   // Sync route tab change to state
   useEffect(() => {
@@ -104,24 +113,32 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
 
   const loadData = async () => {
     try {
-      const [prodData, ordData, revData, revsData, notifData, walletData] = await Promise.all([
+      const [prodData, ordData, revData, revsData, notifData, walletData, configData, txData] = await Promise.all([
         listShopProducts(),
         getShopOrders(),
         getShopRevenue(),
         getShopReviews(),
         getMyNotifications(),
-        getBalance().catch(() => null)
+        getBalance().catch(() => null),
+        getPlatformConfig().catch(() => null),
+        getTransactions().catch(() => null)
       ]);
       setProducts(Array.isArray(prodData?.items) ? prodData.items : Array.isArray(prodData) ? prodData : []);
       setOrders(Array.isArray(ordData) ? ordData : Array.isArray(ordData?.items) ? ordData.items : []);
       if (revData) setRevenueStats(revData);
       setReviews(Array.isArray(revsData) ? revsData : Array.isArray(revsData?.items) ? revsData.items : []);
       setNotifications(Array.isArray(notifData) ? notifData : Array.isArray(notifData?.items) ? notifData.items : []);
-      if (walletData?.data) {
-        setWallet(walletData.data);
-        if (walletData.data.bankAccount) {
-          setBankForm(walletData.data.bankAccount);
+      if (walletData) {
+        setWallet(walletData);
+        if (walletData.bankAccount) {
+          setBankForm(walletData.bankAccount);
         }
+      }
+      if (configData) {
+        setPlatformConfig(configData);
+      }
+      if (txData) {
+        setTransactions(txData.data || []);
       }
     } catch (err) {
       setError('Lỗi khi tải dữ liệu cửa hàng.');
@@ -130,7 +147,7 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
 
   useEffect(() => {
     loadData();
-    
+
     // Khởi tạo Socket
     const socket = connectSocket();
     if (socket) {
@@ -140,6 +157,12 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
       });
       socket.on('wallet_updated', (data) => {
         setWallet(prev => ({ ...prev, balance: data.balance, frozenBalance: data.frozenBalance }));
+        if (data.status === 'completed') {
+          setQrCode(null);
+          setPendingTxId(null);
+          setMessage('Ting ting! Số dư ví của bạn vừa được cộng thêm ' + money(data.amount) + ' đ');
+          getTransactions().then(txData => setTransactions(txData?.data || []));
+        }
       });
     }
 
@@ -173,6 +196,27 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
       loadData();
     } catch (err) {
       setError('Lỗi rút tiền: ' + (err?.response?.data?.message || err.message));
+    }
+  };
+
+  const handleDeposit = async (e) => {
+    e.preventDefault();
+    if (!depositAmount || Number(depositAmount) < 10000) {
+      return setError('Số tiền nạp tối thiểu là 10.000 đ');
+    }
+    try {
+      setMessage(''); setError('');
+      const res = await depositWallet(Number(depositAmount));
+      if (res.qrString) {
+        setQrCode(res.qrString);
+        setOrderCode(res.orderCode);
+        setPendingTxId(res.transactionId);
+        setMessage('Vui lòng dùng ứng dụng ngân hàng quét mã QR để chuyển khoản thanh toán.');
+      }
+      setDepositAmount('');
+      loadData();
+    } catch (err) {
+      setError('Lỗi tạo yêu cầu nạp tiền: ' + (err?.response?.data?.message || err.message));
     }
   };
 
@@ -253,7 +297,7 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
     try {
       setMessage('');
       setError('');
-      
+
       const payload = {
         ...productForm,
         ownerType: 'lender',
@@ -288,7 +332,7 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
       description: product.description || '',
       rentalPrice: product.rentalPrice || '',
       depositPrice: product.depositPrice || '',
-      sizes: Array.isArray(product.sizes) ? product.sizes : (typeof product.sizes === 'string' ? product.sizes.split(',').map(s=>s.trim()) : []),
+      sizes: Array.isArray(product.sizes) ? product.sizes : (typeof product.sizes === 'string' ? product.sizes.split(',').map(s => s.trim()) : []),
       color: product.color || '',
       images: Array.isArray(product.images) ? product.images.map(img => typeof img === 'string' ? img : img.url).filter(Boolean) : [],
       stockQuantity: product.stockQuantity || 1,
@@ -390,7 +434,7 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
     try {
       setMessage('');
       setError('');
-      
+
       const payload = {
         fullName: profileForm.fullName,
         lenderProfile: {
@@ -420,8 +464,8 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
 
   const handlePrintReport = () => {
     const printWindow = window.open('', '_blank');
-      const topProducts = Array.isArray(safeRevenueStats.topProducts) ? safeRevenueStats.topProducts : [];
-      const content = `
+    const topProducts = Array.isArray(safeRevenueStats.topProducts) ? safeRevenueStats.topProducts : [];
+    const content = `
       <html>
         <head>
           <title>Báo Cáo Doanh Thu Shop - BuildLab</title>
@@ -505,22 +549,22 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
 
         <nav className="admin-menu">
           {menuItems.map((item) => (
-            <button 
-              key={item.id} 
-              className={`admin-menu-item ${activeTab === item.id ? 'active' : ''}`} 
+            <button
+              key={item.id}
+              className={`admin-menu-item ${activeTab === item.id ? 'active' : ''}`}
               onClick={() => { setActiveTab(item.id); navigate(`/shop/${item.id}`); }}
             >
               <span>{item.icon}</span>
               {item.label}
               {item.id === 'notifications' && notifications.filter(n => !n.isRead).length > 0 && (
-                <span style={{ 
-                  marginLeft: 'auto', 
-                  background: 'var(--danger)', 
-                  color: 'white', 
-                  borderRadius: '50%', 
-                  width: '20px', 
-                  height: '20px', 
-                  display: 'grid', 
+                <span style={{
+                  marginLeft: 'auto',
+                  background: 'var(--danger)',
+                  color: 'white',
+                  borderRadius: '50%',
+                  width: '20px',
+                  height: '20px',
+                  display: 'grid',
                   placeItems: 'center',
                   fontSize: '0.7rem',
                   fontWeight: '900'
@@ -549,6 +593,33 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
 
         {message && <div className="alert success-alert">{message}</div>}
         {error && <div className="alert">{error}</div>}
+
+        {wallet && platformConfig && wallet.balance < -(platformConfig.maxDebtLimit !== undefined ? platformConfig.maxDebtLimit : 5000000) && (
+          <div className="alert" style={{ background: '#fef2f2', color: '#991b1b', border: '1px solid #fee2e2', padding: '20px', borderRadius: '14px', marginBottom: '20px', boxShadow: '0 4px 15px rgba(220, 38, 38, 0.08)' }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+              <span style={{ fontSize: '1.6rem', lineHeight: 1 }}>⚠️</span>
+              <div>
+                <strong style={{ display: 'block', fontSize: '1.05rem', marginBottom: '6px' }}>CỬA HÀNG ĐANG TẠM NGƯNG HOẠT ĐỘNG (BỊ KHÓA DO NỢ PHÍ SÀN)</strong>
+                <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: '1.5', opacity: 0.9 }}>
+                  Cửa hàng của bạn đang nợ hệ thống: <strong style={{ textDecoration: 'underline' }}>{money(Math.abs(wallet.balance))} đ</strong> (Số dư ví: <strong>{money(wallet.balance)} đ</strong>).
+                </p>
+                <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', lineHeight: '1.5', opacity: 0.9 }}>
+                  Hạn mức nợ phí sàn tối đa cho phép là <strong>-{money(platformConfig.maxDebtLimit !== undefined ? platformConfig.maxDebtLimit : 5000000)} đ</strong>. Vì đã vượt quá hạn mức nợ, toàn bộ sản phẩm của shop hiện đã bị ẩn khỏi trang chủ.
+                </p>
+                <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', lineHeight: '1.5', opacity: 0.9, fontWeight: 'bold' }}>
+                  💡 Vui lòng nạp tối thiểu {money(Math.abs(wallet.balance))} đ để số dư ví trở lại mức an toàn và kích hoạt lại cửa hàng ngay lập tức.
+                </p>
+                <button
+                  onClick={() => { setActiveTab('revenue'); navigate('/shop/revenue'); }}
+                  className="button"
+                  style={{ marginTop: '12px', background: '#991b1b', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}
+                >
+                  Thanh toán nợ ngay ➔
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {user?.lenderProfile?.status === 'Pending' && (
           <div className="alert" style={{ background: '#fffbeb', color: '#b45309', border: '1px solid #fcd34d', marginBottom: '20px' }}>
@@ -660,8 +731,8 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                 <p className="eyebrow">Danh mục trang phục</p>
                 <h2>Kho sản phẩm cửa hàng ({products.length})</h2>
               </div>
-              <button 
-                className="primary-button" 
+              <button
+                className="primary-button"
                 onClick={() => { setEditingProductId(null); setProductForm(emptyProduct); setShowProductForm(true); }}
                 disabled={user?.lenderProfile?.status === 'Pending'}
                 style={{ opacity: user?.lenderProfile?.status === 'Pending' ? 0.5 : 1, cursor: user?.lenderProfile?.status === 'Pending' ? 'not-allowed' : 'pointer' }}
@@ -684,8 +755,8 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
 
                 <div>
                   <label style={{ fontWeight: '800', fontSize: '0.85rem', display: 'block', marginBottom: '5px' }}>Danh mục *</label>
-                  <select 
-                    value={productForm.category} 
+                  <select
+                    value={productForm.category}
                     onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
                     style={{ background: 'white', width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid var(--border)' }}
                   >
@@ -726,7 +797,7 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                     })}
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    <input placeholder="Nhập size khác (VD: 36, 37, XL+)" value={customSize} onChange={(e) => setCustomSize(e.target.value)} onKeyDown={(e) => { if(e.key === 'Enter'){ e.preventDefault(); handleAddCustomSize(); } }} style={{ flex: 1 }} />
+                    <input placeholder="Nhập size khác (VD: 36, 37, XL+)" value={customSize} onChange={(e) => setCustomSize(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCustomSize(); } }} style={{ flex: 1 }} />
                     <button type="button" className="secondary-button" onClick={handleAddCustomSize} style={{ padding: '0 15px', minHeight: '44px' }}>Thêm</button>
                   </div>
                   {Array.isArray(productForm.sizes) && productForm.sizes.filter(s => !STANDARD_SIZES.includes(s)).length > 0 && (
@@ -773,13 +844,13 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                         </div>
                       ))}
                     </div>
-                    
+
                     <div style={{ position: 'relative', display: 'inline-block' }}>
-                      <input 
-                        type="file" 
-                        multiple 
-                        accept="image/*" 
-                        onChange={handleImageUpload} 
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={handleImageUpload}
                         disabled={isUploadingImages}
                         style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
                       />
@@ -801,7 +872,7 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
               {products.map((p) => (
                 <div className="table-row admin-product-row" style={{ padding: '16px', gridTemplateColumns: 'auto 1fr auto' }} key={p._id}>
                   {p.images && p.images.length > 0 ? (
-                    <img src={p.images[0]} alt={p.name} style={{ width: '60px', height: '60px', borderRadius: '10px', objectFit: 'cover' }} />
+                    <img src={p.images[0]?.url || p.images[0]} alt={p.name} style={{ width: '60px', height: '60px', borderRadius: '10px', objectFit: 'cover' }} />
                   ) : (
                     <div style={{ width: '60px', height: '60px', borderRadius: '10px', background: 'var(--surface-soft)', display: 'grid', placeItems: 'center' }}>👗</div>
                   )}
@@ -813,11 +884,11 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                     <p style={{ fontSize: '0.8rem', color: 'var(--muted)', marginTop: '3px' }}>
                       Màu: {p.color || 'Không'} • Sizes: {p.sizes?.join(', ')} • Kho: <strong style={{ color: p.stockQuantity < 2 ? 'var(--danger)' : 'inherit' }}>{p.stockQuantity}</strong>
                     </p>
-                    
+
                     {/* Inline Calendar Busy Dates Manager */}
                     <div style={{ marginTop: '12px', background: 'white', padding: '10px', borderRadius: '10px', border: '1px solid var(--border)', fontSize: '0.8rem' }}>
                       <span style={{ fontWeight: '800', color: 'var(--primary-strong)', display: 'block', marginBottom: '6px' }}>📅 Thiết lập Lịch bận cho trang phục này</span>
-                      
+
                       {p.unavailableDates && p.unavailableDates.length > 0 && (
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
                           {p.unavailableDates.map((bd, bIdx) => (
@@ -838,7 +909,7 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', justifyContent: 'center' }}>
                     <span className={`status-pill ${p.status === 'available' ? 'active' : 'inactive'}`} style={{ alignSelf: 'flex-end', textTransform: 'uppercase', fontSize: '0.7rem' }}>
                       {p.status}
@@ -881,8 +952,8 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <StatusBadge status={o.status} />
-                      <select 
-                        value={o.status} 
+                      <select
+                        value={o.status}
                         onChange={(e) => handleStatusChange(o._id, e.target.value)}
                         style={{ padding: '6px', fontSize: '0.8rem', width: '150px' }}
                       >
@@ -897,7 +968,7 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                     <div style={{ display: 'flex', gap: '6px' }}>
                       <button onClick={() => setSelectedOrder(o)} className="button" style={{ minHeight: '36px', fontSize: '0.82rem' }}>Chi tiết</button>
                       {o.status === 'Pending' && (
-                        <button 
+                        <button
                           onClick={async () => {
                             try {
                               const { confirmOrder } = await import('../services/orders.js');
@@ -907,20 +978,20 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                             } catch (e) {
                               toast.error('Lỗi: ' + e.message);
                             }
-                          }} 
-                          className="button" 
+                          }}
+                          className="button"
                           style={{ minHeight: '36px', fontSize: '0.82rem', background: 'var(--primary)', color: 'white' }}
                         >
                           Xác nhận
                         </button>
                       )}
                       {o.status === 'Approved' && (
-                        <button 
+                        <button
                           onClick={() => {
                             setCheckingInOrder(o);
                             setCheckInImages('');
-                          }} 
-                          className="primary-button" 
+                          }}
+                          className="primary-button"
                           style={{ minHeight: '36px', fontSize: '0.82rem' }}
                         >
                           Giao đồ (Check-in)
@@ -928,23 +999,23 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                       )}
                       {o.status === 'Rented' && (
                         <>
-                          <button 
+                          <button
                             onClick={() => {
                               setCheckingOutOrder(o);
                               setCheckOutImages('');
-                            }} 
-                            className="primary-button" 
+                            }}
+                            className="primary-button"
                             style={{ minHeight: '36px', fontSize: '0.82rem', background: 'var(--success)', borderColor: 'var(--success)' }}
                           >
                             Nhận đồ (Check-out)
                           </button>
-                          <button 
+                          <button
                             onClick={() => {
                               setDisputingOrder(o);
                               setDisputeReason('');
                               setDisputeAmount(0);
-                            }} 
-                            className="button danger" 
+                            }}
+                            className="button danger"
                             style={{ minHeight: '36px', fontSize: '0.82rem' }}
                           >
                             Báo hỏng / Trừ cọc
@@ -970,21 +1041,94 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                   <h2 style={{ margin: 0, fontSize: '2.5rem', fontWeight: 800 }}>
                     {money(wallet?.balance)} <span style={{ fontSize: '1rem', opacity: 0.8 }}>đ</span>
                   </h2>
-                  {wallet?.frozenBalance > 0 && (
-                    <p style={{ margin: '15px 0 0 0', fontSize: '0.85rem', opacity: 0.8 }}>
-                      Đang chờ xử lý: {money(wallet?.frozenBalance)} đ
-                    </p>
+                  {wallet?.balance < 0 && (
+                    <div style={{ marginTop: '10px', background: 'rgba(239, 68, 68, 0.25)', display: 'inline-block', padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold', color: '#fca5a5' }}>
+                      ⚠️ Đang nợ phí dịch vụ: {money(Math.abs(wallet.balance))} đ
+                    </div>
                   )}
+                  <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '15px' }}>
+                    <div style={{ textAlign: 'left' }}>
+                      <p style={{ margin: '0 0 5px 0', fontSize: '0.8rem', opacity: 0.8 }}>Tiền đóng băng (Cọc)</p>
+                      <h3 style={{ margin: 0, fontSize: '1.1rem' }}>{money(wallet?.frozenBalance)} đ</h3>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ margin: '0 0 5px 0', fontSize: '0.8rem', opacity: 0.8 }}>Tổng tài sản</p>
+                      <h3 style={{ margin: 0, fontSize: '1.1rem' }}>{money((wallet?.balance || 0) + (wallet?.frozenBalance || 0))} đ</h3>
+                    </div>
+                  </div>
                 </div>
 
+                <div style={{ marginTop: '15px', background: 'var(--surface-soft)', padding: '12px 15px', borderRadius: '12px', border: '1px solid var(--border)', fontSize: '0.82rem', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '8px', lineHeight: '1.4' }}>
+                  <span>ℹ️</span>
+                  <span>
+                    Hạn mức nợ phí sàn tối đa cho phép: <strong>-{money(platformConfig?.maxDebtLimit !== undefined ? platformConfig.maxDebtLimit : 5000000)} đ</strong>. Cửa hàng sẽ bị khóa nếu số dư ví khả dụng âm vượt quá hạn mức này.
+                  </span>
+                </div>
+
+                {/* Quick Transaction Section */}
                 <div style={{ marginTop: '25px' }}>
-                  <h3 style={{ fontSize: '1rem', marginBottom: '15px' }}>Yêu cầu rút tiền</h3>
-                  <form onSubmit={handleWithdraw} style={{ display: 'flex', gap: '10px' }}>
-                    <input 
-                      type="number" 
-                      placeholder="Nhập số tiền rút..." 
-                      value={withdrawAmount} 
-                      onChange={e => setWithdrawAmount(e.target.value)} 
+                  <h3 style={{ fontSize: '1rem', marginBottom: '15px' }}>Giao dịch nhanh</h3>
+
+                  {/* Form Nạp tiền */}
+                  <form onSubmit={handleDeposit} style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+                    <input
+                      type="number"
+                      placeholder="Nhập số tiền nạp..."
+                      value={depositAmount}
+                      onChange={e => setDepositAmount(e.target.value)}
+                      style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid var(--border)' }}
+                    />
+                    <button type="submit" className="primary-button" style={{ whiteSpace: 'nowrap' }}>Nạp tiền</button>
+                  </form>
+                  {wallet?.balance < 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setDepositAmount(Math.abs(wallet.balance).toString())}
+                      className="button"
+                      style={{ width: '100%', marginBottom: '15px', color: '#991b1b', background: '#fef2f2', border: '1px solid #fee2e2', fontWeight: 'bold', padding: '10px', borderRadius: '8px', fontSize: '0.85rem' }}
+                    >
+                      💡 Tự động điền số tiền trả nợ: {money(Math.abs(wallet.balance))} đ
+                    </button>
+                  )}
+
+                  {qrCode && (
+                    <div style={{ textAlign: 'center', background: '#f8fafc', padding: '20px', borderRadius: '12px', border: '1px solid var(--border)', marginBottom: '15px' }}>
+                      <p style={{ fontWeight: 'bold', marginBottom: '15px', color: 'var(--text)' }}>Quét mã QR để nạp tiền</p>
+
+                      <div style={{ background: 'white', padding: '15px', display: 'inline-block', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}>
+                        <QRCodeCanvas value={qrCode} size={160} level="M" />
+                      </div>
+
+                      <div style={{ marginTop: '15px', textAlign: 'left', background: 'white', padding: '15px', borderRadius: '8px', border: '1px dashed var(--border)' }}>
+                        <p style={{ margin: '0 0 8px', fontSize: '0.85rem', color: 'var(--muted)' }}>Nội dung chuyển khoản (BẮT BUỘC):</p>
+                        <h3 style={{ margin: 0, color: 'var(--primary-strong)', fontSize: '1.3rem', letterSpacing: '2px', fontFamily: 'monospace' }}>{orderCode}</h3>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--danger)', marginTop: '8px', marginBottom: 0 }}>
+                          * Ghi chính xác nội dung trên để hệ thống tự động cộng tiền.
+                        </p>
+                      </div>
+
+                      <p style={{ marginTop: '15px', fontSize: '0.85rem', color: 'var(--muted)' }}>
+                        ⌛ Đang chờ thanh toán nhận diện...
+                      </p>
+
+                      <button
+                        type="button"
+                        className="button"
+                        style={{ marginTop: '10px', width: '100%' }}
+                        onClick={() => { setQrCode(null); setPendingTxId(null); loadData(); }}
+                      >
+                        Đóng
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Form Rút tiền */}
+                  <form onSubmit={handleWithdraw} style={{ display: 'flex', gap: '10px', borderTop: '1px solid var(--border)', paddingTop: '15px' }}>
+                    <input
+                      type="number"
+                      placeholder="Nhập số tiền rút..."
+                      value={withdrawAmount}
+                      onChange={e => setWithdrawAmount(e.target.value)}
                       style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid var(--border)' }}
                     />
                     <button type="submit" className="button" style={{ whiteSpace: 'nowrap' }}>Rút tiền</button>
@@ -1015,9 +1159,9 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '5px' }}>Số Tài khoản</label>
-                      <input 
-                        placeholder="VD: 1029384756" 
-                        value={bankForm.accountNumber} 
+                      <input
+                        placeholder="VD: 1029384756"
+                        value={bankForm.accountNumber}
                         onChange={e => setBankForm({ ...bankForm, accountNumber: e.target.value })}
                         required
                         style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
@@ -1025,9 +1169,9 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                     </div>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '5px' }}>Tên Chủ Tài khoản</label>
-                      <input 
-                        placeholder="VD: NGUYEN VAN A" 
-                        value={bankForm.accountHolderName} 
+                      <input
+                        placeholder="VD: NGUYEN VAN A"
+                        value={bankForm.accountHolderName}
                         onChange={e => setBankForm({ ...bankForm, accountHolderName: e.target.value.toUpperCase() })}
                         required
                         style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
@@ -1083,10 +1227,10 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                         </div>
                         {/* Custom CSS Bar Chart */}
                         <div style={{ height: '12px', background: 'var(--surface-soft)', borderRadius: '999px', overflow: 'hidden' }}>
-                          <div style={{ 
-                            height: '100%', 
-                            width: `${percentage}%`, 
-                            background: 'linear-gradient(90deg, var(--primary-strong), var(--accent))', 
+                          <div style={{
+                            height: '100%',
+                            width: `${percentage}%`,
+                            background: 'linear-gradient(90deg, var(--primary-strong), var(--accent))',
                             borderRadius: '999px',
                             transition: 'width 0.4s ease'
                           }} />
@@ -1109,8 +1253,8 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', justifyContent: 'center', height: '100%' }}>
                   <div style={{ background: 'var(--surface-soft)', padding: '20px', borderRadius: '18px', textAlign: 'center' }}>
                     <h3 style={{ margin: 0, fontSize: '2.2rem', color: 'var(--success)' }}>
-                      {orders.length > 0 
-                        ? `${Math.round((revenueStats.successfulOrders / orders.length) * 100)}%` 
+                      {orders.length > 0
+                        ? `${Math.round((revenueStats.successfulOrders / orders.length) * 100)}%`
                         : '0%'
                       }
                     </h3>
@@ -1129,6 +1273,43 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                 </div>
               </article>
             </div>
+
+            {/* Lịch sử giao dịch ví của Shop */}
+            <article className="card" style={{ marginTop: '20px' }}>
+              <div className="section-heading compact-heading">
+                <p className="eyebrow">Lịch sử tài chính</p>
+                <h2>Lịch sử giao dịch ví của Shop</h2>
+              </div>
+              {transactions.length === 0 ? (
+                <div className="empty-state" style={{ marginTop: '15px' }}>Chưa có lịch sử giao dịch nào.</div>
+              ) : (
+                <div style={{ display: 'grid', gap: '15px', marginTop: '15px' }}>
+                  {transactions.slice(0, 15).map(tx => (
+                    <div key={tx._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '15px', borderBottom: '1px solid var(--border)' }}>
+                      <div>
+                        <strong style={{ display: 'block', textTransform: 'capitalize', fontSize: '0.95rem' }}>
+                          {tx.type === 'deposit' ? 'Nạp tiền' : tx.type === 'withdrawal' ? 'Rút tiền' : tx.type === 'payment' ? 'Thanh toán' : tx.type === 'refund' ? 'Hoàn tiền' : tx.type}
+                        </strong>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
+                          {new Date(tx.createdAt).toLocaleString('vi-VN')} • {tx.description}
+                        </span>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <strong style={{ color: ['deposit', 'refund'].includes(tx.type) ? 'var(--success)' : 'var(--danger)', fontSize: '1rem' }}>
+                          {['deposit', 'refund'].includes(tx.type) ? '+' : '-'}{money(tx.amount)} đ
+                        </strong>
+                        <span style={{
+                          display: 'block', fontSize: '0.75rem', fontWeight: 'bold',
+                          color: tx.status === 'completed' ? 'var(--success)' : tx.status === 'pending' ? 'var(--warning)' : 'var(--danger)'
+                        }}>
+                          {tx.status === 'completed' ? 'Thành công' : tx.status === 'pending' ? 'Đang xử lý' : tx.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </article>
           </div>
         )}
 
@@ -1141,7 +1322,7 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
               <p className="eyebrow">Cấu hình Shop</p>
               <h2>Thiết lập thông tin cửa hàng & Chính sách</h2>
             </div>
-            
+
             <form onSubmit={handleProfileSubmit} className="input-group" style={{ maxWidth: '780px', gap: '18px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                 <div>
@@ -1177,22 +1358,22 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
 
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: '20px', marginTop: '10px' }}>
                 <h3 style={{ margin: '0 0 15px' }}>Quản lý chính sách cho thuê & Đền bù</h3>
-                
+
                 <div style={{ display: 'grid', gap: '15px' }}>
                   <div>
                     <label style={{ fontWeight: '800', display: 'block', marginBottom: '5px' }}>Chính sách Thuê & Đặt cọc</label>
-                    <textarea 
-                      placeholder="Thuê tối thiểu 1 ngày, đặt cọc 100% giá trị sản phẩm khi nhận đồ." 
-                      value={profileForm.rentalPolicy} 
-                      onChange={(e) => setProfileForm({ ...profileForm, rentalPolicy: e.target.value })} 
+                    <textarea
+                      placeholder="Thuê tối thiểu 1 ngày, đặt cọc 100% giá trị sản phẩm khi nhận đồ."
+                      value={profileForm.rentalPolicy}
+                      onChange={(e) => setProfileForm({ ...profileForm, rentalPolicy: e.target.value })}
                     />
                   </div>
                   <div>
                     <label style={{ fontWeight: '800', display: 'block', marginBottom: '5px' }}>Quy định Xử phạt khi Trễ Hạn đồ</label>
-                    <textarea 
-                      placeholder="Trễ hạn đền bù phạt 50.000 đ/ngày trễ." 
-                      value={profileForm.latePenaltyPolicy} 
-                      onChange={(e) => setProfileForm({ ...profileForm, latePenaltyPolicy: e.target.value })} 
+                    <textarea
+                      placeholder="Trễ hạn đền bù phạt 50.000 đ/ngày trễ."
+                      value={profileForm.latePenaltyPolicy}
+                      onChange={(e) => setProfileForm({ ...profileForm, latePenaltyPolicy: e.target.value })}
                     />
                   </div>
                 </div>
@@ -1212,7 +1393,7 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
               <p className="eyebrow">Khách hàng</p>
               <h2>Đánh giá từ khách hàng đã thuê trang phục</h2>
             </div>
-            
+
             <div style={{ display: 'grid', gap: '20px', padding: '10px' }}>
               {reviews.map((r) => (
                 <div key={r._id} style={{ border: '1px solid var(--border)', borderRadius: '18px', padding: '18px', background: '#f8fafc' }}>
@@ -1236,7 +1417,7 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                   <p style={{ margin: '12px 0 6px', fontSize: '0.92rem', color: 'var(--primary-strong)' }}>
                     Đánh giá cho: <strong>{r.product?.name || 'Trang phục'}</strong>
                   </p>
-                  
+
                   <blockquote style={{ margin: '0 0 15px', paddingLeft: '10px', borderLeft: '3px solid var(--accent)', color: 'var(--muted)', fontStyle: 'italic', fontSize: '0.9rem' }}>
                     "{r.comment || 'Khách hàng không để lại bình luận.'}"
                   </blockquote>
@@ -1252,8 +1433,8 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                     </div>
                   ) : (
                     <div style={{ display: 'flex', gap: '8px', marginLeft: '20px' }}>
-                      <input 
-                        placeholder="Nhập phản hồi nhanh cảm ơn khách..." 
+                      <input
+                        placeholder="Nhập phản hồi nhanh cảm ơn khách..."
                         value={replyText[r._id] || ''}
                         onChange={(e) => setReplyText({ ...replyText, [r._id]: e.target.value })}
                         style={{ height: '38px', padding: '0 12px', fontSize: '0.82rem', borderRadius: '12px' }}
@@ -1275,15 +1456,15 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
               <p className="eyebrow">Hộp thư</p>
               <h2>Thông báo hoạt động ({notifications.filter(n => !n.isRead).length} mới)</h2>
             </div>
-            
+
             <div style={{ display: 'grid', gap: '10px', padding: '10px' }}>
               {notifications.map((n) => (
-                <div 
-                  key={n._id} 
-                  style={{ 
-                    border: '1px solid var(--border)', 
-                    borderRadius: '16px', 
-                    padding: '16px', 
+                <div
+                  key={n._id}
+                  style={{
+                    border: '1px solid var(--border)',
+                    borderRadius: '16px',
+                    padding: '16px',
                     background: n.isRead ? 'white' : '#f0f4ff',
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -1301,8 +1482,8 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                     </span>
                   </div>
                   {!n.isRead && (
-                    <button 
-                      onClick={() => handleMarkNotifRead(n._id)} 
+                    <button
+                      onClick={() => handleMarkNotifRead(n._id)}
                       className="button"
                       style={{ minHeight: '34px', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
                     >
@@ -1344,8 +1525,8 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
             border: '1px solid var(--border)',
             position: 'relative'
           }}>
-            <button 
-              onClick={() => setSelectedOrder(null)} 
+            <button
+              onClick={() => setSelectedOrder(null)}
               style={{
                 position: 'absolute',
                 top: '20px',
@@ -1499,21 +1680,21 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
 
             <div className="input-group" style={{ marginBottom: '15px' }}>
               <label style={{ fontWeight: '800' }}>Mã QR / Token của khách</label>
-              <input 
+              <input
                 id="checkInQrToken"
-                type="text" 
-                placeholder="Dán mã Token vào đây..." 
-                required 
+                type="text"
+                placeholder="Dán mã Token vào đây..."
+                required
               />
             </div>
-            
+
             <div className="input-group" style={{ marginBottom: '20px' }}>
               <label style={{ fontWeight: '800' }}>Link hình ảnh tình trạng giao (Tùy chọn)</label>
-              <input 
-                type="text" 
-                placeholder="Cách nhau bởi dấu phẩy nếu nhiều link..." 
-                value={checkInImages} 
-                onChange={(e) => setCheckInImages(e.target.value)} 
+              <input
+                type="text"
+                placeholder="Cách nhau bởi dấu phẩy nếu nhiều link..."
+                value={checkInImages}
+                onChange={(e) => setCheckInImages(e.target.value)}
               />
             </div>
 
@@ -1557,11 +1738,11 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
 
             <div className="input-group" style={{ marginBottom: '20px' }}>
               <label style={{ fontWeight: '800' }}>Link hình ảnh tình trạng nhận lại (Tùy chọn)</label>
-              <input 
-                type="text" 
-                placeholder="Cách nhau bởi dấu phẩy..." 
-                value={checkOutImages} 
-                onChange={(e) => setCheckOutImages(e.target.value)} 
+              <input
+                type="text"
+                placeholder="Cách nhau bởi dấu phẩy..."
+                value={checkOutImages}
+                onChange={(e) => setCheckOutImages(e.target.value)}
               />
             </div>
 
@@ -1588,11 +1769,11 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
               setError('');
               setMessage('');
               const { createDispute } = await import('../services/dispute.js');
-              await createDispute({ 
-                orderId: disputingOrder._id, 
-                reason: disputeReason, 
-                description: 'Lender báo cáo sự cố khi nhận lại đồ.', 
-                requestedAmount: disputeAmount 
+              await createDispute({
+                orderId: disputingOrder._id,
+                reason: disputeReason,
+                description: 'Lender báo cáo sự cố khi nhận lại đồ.',
+                requestedAmount: disputeAmount
               });
               setMessage('Đã gửi khiếu nại. Admin sẽ vào phân xử tiền cọc.');
               setDisputingOrder(null);
@@ -1611,24 +1792,24 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
 
             <div className="input-group" style={{ marginBottom: '15px' }}>
               <label style={{ fontWeight: '800' }}>Lý do khiếu nại</label>
-              <input 
-                type="text" 
-                placeholder="VD: Rách áo, thiếu phụ kiện..." 
-                value={disputeReason} 
-                onChange={(e) => setDisputeReason(e.target.value)} 
-                required 
+              <input
+                type="text"
+                placeholder="VD: Rách áo, thiếu phụ kiện..."
+                value={disputeReason}
+                onChange={(e) => setDisputeReason(e.target.value)}
+                required
               />
             </div>
-            
+
             <div className="input-group" style={{ marginBottom: '20px' }}>
               <label style={{ fontWeight: '800' }}>Số tiền muốn trừ (VNĐ)</label>
-              <input 
-                type="number" 
+              <input
+                type="number"
                 min="0"
-                placeholder="Nhập số tiền..." 
-                value={disputeAmount} 
-                onChange={(e) => setDisputeAmount(Number(e.target.value))} 
-                required 
+                placeholder="Nhập số tiền..."
+                value={disputeAmount}
+                onChange={(e) => setDisputeAmount(Number(e.target.value))}
+                required
               />
             </div>
 

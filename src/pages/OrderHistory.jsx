@@ -111,7 +111,7 @@ const OrderHistory = () => {
                 <div>
                   <strong style={{ fontSize: '1.05rem', color: 'var(--primary-strong)' }}>{displayTitle}</strong>
                   <p style={{ color: 'var(--muted)', fontSize: '0.88rem', marginTop: '4px' }}>
-                    Mã: <code style={{ background: 'var(--surface-soft)', padding: '2px 6px', borderRadius: '4px' }}>{order._id.slice(-8).toUpperCase()}</code> • {date(order.rentalStartDate)} - {date(order.rentalEndDate)} ({order.rentalDays} ngày)
+                    Mã: <code style={{ background: 'var(--surface-soft)', padding: '2px 6px', borderRadius: '4px' }}>{order._id.slice(-8).toUpperCase()}</code> • {date(order.startDate)} - {date(order.endDate)} ({order.pricing?.rentalDays || order.rentalDays} ngày)
                   </p>
                   <p style={{ fontWeight: '800', marginTop: '6px' }}>{money(order.pricing?.totalAmount || order.totalAmount)} đ</p>
                 </div>
@@ -333,9 +333,9 @@ const OrderHistory = () => {
               </div>
               <div style={{ textAlign: 'right' }}>
                 <strong style={{ color: 'var(--muted)', display: 'block', marginBottom: '4px', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Đối tác cho thuê</strong>
-                <strong>{selectedOrder.shop?.fullName || 'Shop đối tác'}</strong>
-                <p style={{ color: 'var(--muted)', margin: '2px 0' }}>Email: {selectedOrder.shop?.email || 'N/A'}</p>
-                <p style={{ color: 'var(--muted)', margin: '2px 0' }}>SĐT: {selectedOrder.shop?.phone || 'N/A'}</p>
+                <strong>{selectedOrder.lender?.shopName || 'Shop đối tác'}</strong>
+                <p style={{ color: 'var(--muted)', margin: '2px 0' }}>Email: {selectedOrder.lender?.user?.email || 'N/A'}</p>
+                <p style={{ color: 'var(--muted)', margin: '2px 0' }}>SĐT: {selectedOrder.lender?.user?.phone || 'Chưa cập nhật'}</p>
               </div>
             </div>
 
@@ -344,55 +344,62 @@ const OrderHistory = () => {
                 <div>
                   <strong>Thời gian bắt đầu thuê:</strong>
                   <p style={{ fontSize: '1rem', color: 'var(--primary-strong)', marginTop: '4px', fontWeight: '800' }}>
-                    {date(selectedOrder.rentalStartDate)}
+                    {date(selectedOrder.startDate)}
                   </p>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <strong>Thời gian hoàn trả đồ:</strong>
                   <p style={{ fontSize: '1rem', color: 'var(--primary-strong)', marginTop: '4px', fontWeight: '800' }}>
-                    {date(selectedOrder.rentalEndDate)}
+                    {date(selectedOrder.endDate)}
                   </p>
                 </div>
               </div>
               <div style={{ borderTop: '1px solid var(--border)', marginTop: '10px', paddingTop: '10px', display: 'flex', justifyContent: 'space-between' }}>
                 <span>Tổng số ngày đặt thuê trang phục:</span>
-                <strong>{selectedOrder.rentalDays} ngày</strong>
+                <strong>{selectedOrder.pricing?.rentalDays || selectedOrder.rentalDays} ngày</strong>
               </div>
             </div>
 
             <strong style={{ display: 'block', marginBottom: '10px', fontSize: '0.85rem', textTransform: 'uppercase', color: 'var(--muted)' }}>Danh sách trang phục thuê</strong>
             <div style={{ border: '1px solid var(--border)', borderRadius: '18px', overflow: 'hidden', marginBottom: '20px' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
-                <thead>
-                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border)', textAlign: 'left', fontWeight: '800' }}>
-                    <th style={{ padding: '12px' }}>Trang phục</th>
-                    <th style={{ padding: '12px', textAlign: 'center' }}>Size/Màu</th>
-                    <th style={{ padding: '12px', textAlign: 'center' }}>SL</th>
-                    <th style={{ padding: '12px', textAlign: 'right' }}>Đơn giá/ngày</th>
-                    <th style={{ padding: '12px', textAlign: 'right' }}>Tạm tính</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(selectedOrder.items && selectedOrder.items.length > 0 ? selectedOrder.items : [
-                    {
-                      name: selectedOrder.product?.name || 'Trang phục thuê',
-                      size: selectedOrder.size || 'N/A',
-                      color: selectedOrder.product?.color || 'N/A',
-                      quantity: 1,
-                      rentalPricePerDay: selectedOrder.product?.rentalPricePerDay || 0,
-                      subtotal: selectedOrder.subtotal || 0
-                    }
-                  ]).map((item, idx) => (
-                    <tr style={{ borderBottom: '1px solid var(--border)' }} key={idx}>
-                      <td style={{ padding: '12px', fontWeight: '800' }}>{item.name}</td>
-                      <td style={{ padding: '12px', textAlign: 'center', color: 'var(--muted)' }}>{item.size} / {item.color || 'N/A'}</td>
-                      <td style={{ padding: '12px', textAlign: 'center' }}>{item.quantity}</td>
-                      <td style={{ padding: '12px', textAlign: 'right' }}>{money(item.rentalPricePerDay || selectedOrder.pricing?.rentalFee)} đ</td>
-                      <td style={{ padding: '12px', textAlign: 'right', fontWeight: '800' }}>{money(item.subtotal || selectedOrder.pricing?.rentalFee)} đ</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                 <thead>
+                   <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border)', textAlign: 'left', fontWeight: '800' }}>
+                     <th style={{ padding: '12px', width: '80px' }}>Ảnh</th>
+                     <th style={{ padding: '12px' }}>Trang phục</th>
+                     <th style={{ padding: '12px', textAlign: 'center' }}>Size/Màu</th>
+                     <th style={{ padding: '12px', textAlign: 'center' }}>SL</th>
+                     <th style={{ padding: '12px', textAlign: 'right' }}>Đơn giá/ngày</th>
+                     <th style={{ padding: '12px', textAlign: 'right' }}>Tạm tính</th>
+                   </tr>
+                 </thead>
+                 <tbody>
+                   {(selectedOrder.items && selectedOrder.items.length > 0 ? selectedOrder.items : [
+                     {
+                       name: selectedOrder.product?.name || 'Trang phục thuê',
+                       size: selectedOrder.size || 'N/A',
+                       color: selectedOrder.product?.color || 'N/A',
+                       quantity: 1,
+                       rentalPricePerDay: selectedOrder.product?.rentalPrice || 0,
+                       subtotal: selectedOrder.pricing?.rentalFee || selectedOrder.subtotal || 0
+                     }
+                   ]).map((item, idx) => {
+                     const itemImage = selectedOrder.product?.images?.[0]?.url || selectedOrder.product?.images?.[0] || 'https://placehold.co/100x100?text=Dress';
+                     return (
+                       <tr style={{ borderBottom: '1px solid var(--border)' }} key={idx}>
+                         <td style={{ padding: '12px' }}>
+                           <img src={itemImage} alt={item.name} style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'cover', border: '1px solid var(--border)' }} />
+                         </td>
+                         <td style={{ padding: '12px', fontWeight: '800' }}>{item.name}</td>
+                         <td style={{ padding: '12px', textAlign: 'center', color: 'var(--muted)' }}>{item.size || selectedOrder.size || 'N/A'} / {item.color || 'N/A'}</td>
+                         <td style={{ padding: '12px', textAlign: 'center' }}>{item.quantity}</td>
+                         <td style={{ padding: '12px', textAlign: 'right' }}>{money(item.rentalPricePerDay || selectedOrder.pricing?.rentalFee / (selectedOrder.pricing?.rentalDays || 1))} đ</td>
+                         <td style={{ padding: '12px', textAlign: 'right', fontWeight: '800' }}>{money(item.subtotal)} đ</td>
+                       </tr>
+                     );
+                   })}
+                 </tbody>
+               </table>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px', fontSize: '0.9rem' }}>

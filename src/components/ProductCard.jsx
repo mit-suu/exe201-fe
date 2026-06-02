@@ -11,6 +11,10 @@ const categoryLabels = {
 };
 
 const conditionLabels = {
+  'New': 'Mới',
+  'Like New': 'Như mới',
+  'Good': 'Tốt',
+  'Fair': 'Khá',
   new: 'Mới',
   excellent: 'Rất tốt',
   good: 'Tốt',
@@ -18,7 +22,17 @@ const conditionLabels = {
 };
 
 const ProductCard = ({ product }) => {
-  const [imageSrc, setImageSrc] = useState(product.images?.[0] || 'https://placehold.co/800x620/f1f5f9/111827?text=BuildLab');
+  const [imageSrc, setImageSrc] = useState(
+    (product.images?.[0]?.url || product.images?.[0]) || 'https://placehold.co/800x620/f1f5f9/111827?text=BuildLab'
+  );
+
+  const availableSizes = Array.isArray(product.sizes)
+    ? product.sizes
+    : typeof product.size === 'string'
+      ? product.size.split(',').map(s => s.trim()).filter(Boolean)
+      : (product.size ? [product.size] : []);
+
+  const stockQuantity = product.inventory?.quantityTotal ?? product.stockQuantity ?? 1;
 
   return (
     <article className="product-card">
@@ -30,12 +44,13 @@ const ProductCard = ({ product }) => {
         <div className="product-title-row">
           <div>
             <h3>{product.name}</h3>
-            <p>{conditionLabels[product.condition] || product.condition} • Còn {product.stockQuantity || 0} bộ</p>
+            <p>{conditionLabels[product.condition] || product.condition} • Còn {stockQuantity} bộ</p>
           </div>
         </div>
         <p className="product-description">{product.description}</p>
         <div className="size-row">
-          {(product.sizes || []).slice(0, 4).map((size) => <span key={size}>{size}</span>)}
+          {availableSizes.slice(0, 4).map((size) => <span key={size}>{size}</span>)}
+          {availableSizes.length === 0 && <span>Freesize</span>}
         </div>
         <div className="price-row">
           <div>

@@ -17,6 +17,10 @@ const categoryLabels = {
 };
 
 const conditionLabels = {
+  'New': 'Mới (New)',
+  'Like New': 'Như mới (Like New)',
+  'Good': 'Tốt (Good)',
+  'Fair': 'Khá (Fair)',
   excellent: 'Xuất sắc',
   good: 'Tốt',
   fair: 'Khá',
@@ -73,7 +77,12 @@ const ProductDetail = () => {
   useEffect(() => {
     getProduct(id).then((item) => {
       setProduct(item);
-      setForm((old) => ({ ...old, size: item.sizes?.[0] || '' }));
+      const parsedSizes = Array.isArray(item.sizes)
+        ? item.sizes
+        : typeof item.size === 'string'
+          ? item.size.split(',').map(s => s.trim()).filter(Boolean)
+          : (item.size ? [item.size] : []);
+      setForm((old) => ({ ...old, size: old.size || parsedSizes[0] || '' }));
     });
     getProductReviews(id).then(setReviews).catch(() => setReviews([]));
   }, [id]);
@@ -136,10 +145,20 @@ const ProductDetail = () => {
     );
   }
 
-  const images = product.images?.length ? product.images : ['https://placehold.co/900x620?text=BuildLab'];
+  const images = product.images?.length
+    ? product.images.map(img => typeof img === 'string' ? img : img?.url).filter(Boolean)
+    : ['https://placehold.co/900x620?text=BuildLab'];
   const status = statusConfig[product.status] || statusConfig.available;
   const shopData = product.shop || {};
   const shopName = shopData.fullName || 'Shop';
+
+  const availableSizes = Array.isArray(product.sizes)
+    ? product.sizes
+    : typeof product.size === 'string'
+      ? product.size.split(',').map(s => s.trim()).filter(Boolean)
+      : (product.size ? [product.size] : []);
+
+  const stockQuantity = product.inventory?.quantityTotal ?? product.stockQuantity ?? 1;
 
   return (
     <div className="pd-page">
@@ -230,19 +249,20 @@ const ProductDetail = () => {
               <div className="pd-attr">
                 <span className="pd-attr-icon"><Package size={18} strokeWidth={1.5} /></span>
                 <div>
-                  <span className="pd-attr-label">Tồn kho</span>
-                  <span className="pd-attr-value">{product.stockQuantity} bộ</span>
+                   <span className="pd-attr-label">Tồn kho</span>
+                   <span className="pd-attr-value">{stockQuantity} bộ</span>
                 </div>
               </div>
               <div className="pd-attr">
                 <span className="pd-attr-icon"><Ruler size={18} strokeWidth={1.5} /></span>
                 <div>
-                  <span className="pd-attr-label">Size có sẵn</span>
-                  <div className="pd-size-chips">
-                    {product.sizes?.map((s) => (
-                      <span key={s} className="pd-size-chip">{s}</span>
-                    ))}
-                  </div>
+                   <span className="pd-attr-label">Size có sẵn</span>
+                   <div className="pd-size-chips">
+                     {availableSizes.map((s) => (
+                       <span key={s} className="pd-size-chip">{s}</span>
+                     ))}
+                     {availableSizes.length === 0 && <span style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>Freesize</span>}
+                   </div>
                 </div>
               </div>
             </div>
@@ -415,7 +435,7 @@ const ProductDetail = () => {
                 <div className="pd-form-group">
                   <span className="pd-form-label">Chọn Size</span>
                   <div className="pd-size-selector">
-                    {product.sizes?.map((s) => (
+                    {availableSizes.map((s) => (
                       <button
                         key={s}
                         type="button"
@@ -425,6 +445,9 @@ const ProductDetail = () => {
                         {s}
                       </button>
                     ))}
+                    {availableSizes.length === 0 && (
+                      <span style={{ color: 'var(--muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>Không cần chọn size (Freesize)</span>
+                    )}
                   </div>
                 </div>
 
