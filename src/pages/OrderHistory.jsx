@@ -333,7 +333,7 @@ const OrderHistory = () => {
               </div>
               <div style={{ textAlign: 'right' }}>
                 <strong style={{ color: 'var(--muted)', display: 'block', marginBottom: '4px', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Đối tác cho thuê</strong>
-                <strong>{selectedOrder.lender?.shopName || 'Shop đối tác'}</strong>
+                <strong>{selectedOrder.lender?.lenderName || 'Lender đối tác'}</strong>
                 <p style={{ color: 'var(--muted)', margin: '2px 0' }}>Email: {selectedOrder.lender?.user?.email || 'N/A'}</p>
                 <p style={{ color: 'var(--muted)', margin: '2px 0' }}>SĐT: {selectedOrder.lender?.user?.phone || 'Chưa cập nhật'}</p>
               </div>

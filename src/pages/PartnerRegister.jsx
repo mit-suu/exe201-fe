@@ -14,7 +14,7 @@ const PartnerRegister = () => {
     acceptEContract: false
   });
   const [shopInfo, setShopInfo] = useState({
-    shopName: '',
+    lenderName: '',
     phone: '',
     addressLine1: '',
     addressLine2: '',
@@ -246,12 +246,12 @@ const PartnerRegister = () => {
           <div className="form-section">
             <div className="form-section-title">Thông tin cửa hàng</div>
             <div className="input-group">
-              <label>Tên cửa hàng (Shop Name)</label>
+              <label>Tên cửa hàng (Lender Name)</label>
               <input
                 type="text"
-                name="shopName"
+                name="lenderName"
                 placeholder="Ví dụ: BuildLab Wedding"
-                value={shopInfo.shopName}
+                value={shopInfo.lenderName}
                 onChange={handleShopChange}
                 required
               />
