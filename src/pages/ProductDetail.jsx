@@ -276,7 +276,7 @@ const ProductDetail = () => {
                 <div>
                   <h3 className="pd-shop-name">
                     {shopName}
-                    {shopData.lenderProfile?.isVerified && <span className="pd-verified-badge">✓</span>}
+                    {shopData.lenderProfile?.isVerified && <span className="pd-verified-badge" style={{ display: 'inline-flex', alignItems: 'center', background: '#f3f4f6', padding: '2px 4px', borderRadius: '4px' }}><CheckCircle size={12} style={{ color: '#6b7280' }} /></span>}
                   </h3>
                   {shopData.lenderProfile?.bio && (
                     <p className="pd-shop-bio">{shopData.lenderProfile.bio}</p>
@@ -289,7 +289,9 @@ const ProductDetail = () => {
                   <span className="pd-shop-stat-label">Đánh giá</span>
                 </div>
                 <div className="pd-shop-stat">
-                  <span className="pd-shop-stat-value">{shopData.lenderProfile?.isVerified ? '✓' : '✗'}</span>
+                  <span className="pd-shop-stat-value" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {shopData.lenderProfile?.isVerified ? <CheckCircle size={16} style={{ color: '#6b7280' }} /> : <XCircle size={16} style={{ color: '#6b7280' }} />}
+                  </span>
                   <span className="pd-shop-stat-label">Xác minh</span>
                 </div>
                 <div className="pd-shop-stat">

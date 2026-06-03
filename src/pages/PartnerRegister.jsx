@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { FileText, CheckCircle } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../services/api.js';
 import { saveSession } from '../services/auth.js';
@@ -195,7 +196,9 @@ const PartnerRegister = () => {
                   </button>
                 ) : (
                   <div style={{ color: 'var(--success)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <span>✅ Đã ký hợp đồng</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <CheckCircle size={14} style={{ color: '#6b7280' }} /> Đã ký hợp đồng
+                    </span>
                     <button type="button" onClick={() => setShowContractModal(true)} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: '0.8rem', textDecoration: 'underline' }}>(Xem lại)</button>
                   </div>
                 )}
@@ -211,7 +214,9 @@ const PartnerRegister = () => {
                 {licenseUrl ? (
                   <div>
                     <img src={licenseUrl} alt="License" style={{ maxHeight: '150px', borderRadius: '8px', marginBottom: '10px' }} />
-                    <div style={{ color: 'var(--success)', fontWeight: 600, fontSize: '0.9rem' }}>✅ Đã tải ảnh thành công</div>
+                    <div style={{ color: 'var(--success)', fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                      <CheckCircle size={14} style={{ color: '#6b7280' }} /> Đã tải ảnh thành công
+                    </div>
                     <button type="button" onClick={() => { setLicenseUrl(''); setLicenseFile(null); }} style={{ marginTop: '10px', background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', textDecoration: 'underline' }}>
                       Tải ảnh khác
                     </button>
@@ -232,7 +237,7 @@ const PartnerRegister = () => {
                       </div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', color: 'var(--muted)' }}>
-                        <span style={{ fontSize: '2rem' }}>📄</span>
+                        <FileText size={32} style={{ color: '#9ca3af' }} />
                         <span>Nhấn hoặc Kéo thả ảnh vào đây</span>
                         <small>Hỗ trợ JPG, PNG (Tối đa 5MB)</small>
                       </div>
