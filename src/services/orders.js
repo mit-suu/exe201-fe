@@ -3,7 +3,9 @@ import api from './api.js';
 export const createOrder = async (payload) => (await api.post('/orders', payload)).data.data;
 export const getMyOrders = async () => (await api.get('/orders/me')).data.data;
 export const getOrder = async (id) => (await api.get(`/orders/${id}`)).data.data;
-export const cancelOrder = async (id) => (await api.patch(`/orders/${id}/cancel`)).data.data;
+
+export const cancelOrder = async (id, reason) => (await api.post(`/orders/${id}/cancel`, { reason })).data.data;
+
 export const getAllOrders = async (params = {}) => (await api.get('/orders', { params })).data.data;
 export const getLenderOrders = async (params = {}) => (await api.get('/orders/lender/me', { params })).data.data;
 export const getLenderRevenue = async () => (await api.get('/orders/lender/revenue')).data.data;
