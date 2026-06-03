@@ -9,32 +9,28 @@ import { updateOrderStatus } from '../services/orders.js';
 import { updateProduct } from '../services/products.js';
 import ChatBox from '../components/ChatBox.jsx';
 import { getConversations } from '../services/chats.js';
-import { BarChart3, Users, Store, Shirt, ShoppingBag, Tags, Settings, ShieldAlert, Wallet, MessageSquare, LogOut, AlertTriangle, Clock, Info } from 'lucide-react';
+import { BarChart3, Users, Store, Shirt, ShoppingBag, Tags, Settings, ShieldAlert, Wallet, MessageSquare, LogOut, AlertTriangle, Clock, Info, ExternalLink } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { connectSocket, disconnectSocket } from '../services/socket.js';
 
 const money = (value) => Number(value || 0).toLocaleString('vi-VN');
 const date = (value) => value ? new Date(value).toLocaleDateString('vi-VN') : 'Chưa có';
 
-// ─── HELPER: chuẩn hóa order từ backend (renter/lender → user/shop) ──────────
 const normalizeOrder = (o) => ({
   ...o,
-  // Backend dùng "renter", frontend cần "user"
-  user:  o.user  ?? o.renter  ?? null,
-  // Backend dùng "lender" (LenderProfile object), frontend cần "shop" với fullName/email
-  shop:  o.shop  ?? (o.lender ? {
-    _id:      o.lender._id,
+  user: o.user ?? o.renter ?? null,
+  shop: o.shop ?? (o.lender ? {
+    _id: o.lender._id,
     fullName: o.lender.lenderName || o.lender.user?.fullName || 'N/A',
-    email:    o.lender.user?.email || 'N/A',
+    email: o.lender.user?.email || 'N/A',
   } : null),
-  // Chuẩn hóa totalAmount
   totalAmount: o.totalAmount ?? o.pricing?.totalAmount ?? 0,
-  // Chuẩn hóa tên sản phẩm hiển thị
   _productName: o.items?.[0]?.name || o.product?.name || o.costume?.name || 'Trang phục',
 });
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  
+
   const [activeTab, setActiveTab] = useState('reports');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -88,7 +84,6 @@ const AdminDashboard = () => {
       setCustomers(custs || []);
       setShops(shps || []);
       setCostumes(prods?.items || []);
-      // ── FIX: chuẩn hóa toàn bộ orders trước khi lưu vào state ──
       setOrders((ords || []).map(normalizeOrder));
       if (config) setPlatformConfig(config);
       if (bankInfo) setAdminBankInfo(bankInfo);
@@ -101,6 +96,67 @@ const AdminDashboard = () => {
   };
 
   useEffect(() => { loadData(); }, []);
+
+  // WebSocket cho realtime updates
+  useEffect(() => {
+    const socket = connectSocket();
+    
+    if (socket) {
+      console.log('[Admin] WebSocket đã kết nối');
+      
+      // Lắng nghe cập nhật ví (nạp/rút tiền)
+      socket.on('wallet_updated', (data) => {
+        console.log('[Admin] wallet_updated:', data);
+        
+        if (data.type === 'withdrawal') {
+          if (data.status === 'completed') {
+            toast.success(`Rút tiền ${money(data.amount)}đ đã hoàn tất`);
+            loadData();
+          } else if (data.status === 'failed') {
+            toast.error(`Yêu cầu rút tiền ${money(data.amount)}đ đã thất bại`);
+            loadData();
+          } else if (data.status === 'processing') {
+            toast.loading(`Đang xử lý rút tiền ${money(data.amount)}đ...`, { duration: 2000 });
+            loadData();
+          }
+        }
+        
+        if (data.type === 'deposit' && data.status === 'completed') {
+          toast.success(`Nạp tiền ${money(data.amount)}đ thành công`);
+          loadData();
+        }
+      });
+      
+      // Lắng nghe đơn hàng mới
+      socket.on('new_order', (data) => {
+        toast.info(`Có đơn hàng mới: ${data.productName || 'Trang phục'}`);
+        loadData();
+      });
+      
+      // Lắng nghe cập nhật đơn hàng
+      socket.on('order_updated', (data) => {
+        toast.info(`Đơn hàng #${data.orderId?.slice(-6)} đã được cập nhật`);
+        loadData();
+      });
+
+      // Lắng nghe khi có tranh chấp mới
+      socket.on('new_dispute', (data) => {
+        toast.error(`Tranh chấp mới từ đơn hàng #${data.orderId?.slice(-6)}`);
+        loadData();
+      });
+    }
+    
+    return () => {
+      if (socket) {
+        socket.off('wallet_updated');
+        socket.off('new_order');
+        socket.off('order_updated');
+        socket.off('new_dispute');
+        console.log('[Admin] WebSocket đã ngắt kết nối');
+      }
+      disconnectSocket();
+    };
+  }, []);
 
   useEffect(() => {
     if (activeTab === 'chat') {
@@ -214,16 +270,16 @@ const AdminDashboard = () => {
   };
 
   const menuItems = [
-    { id: 'reports',          label: 'Báo cáo doanh thu',    icon: <BarChart3 size={20} /> },
-    { id: 'users',            label: 'Khách hàng',            icon: <Users size={20} /> },
-    { id: 'shops',            label: 'Cửa hàng (Shops)',      icon: <Store size={20} /> },
-    { id: 'costumes',         label: 'Trang phục',            icon: <Shirt size={20} /> },
-    { id: 'orders',           label: 'Đơn đặt thuê',          icon: <ShoppingBag size={20} /> },
-    { id: 'categories',       label: 'Danh mục',              icon: <Tags size={20} /> },
-    { id: 'config',           label: 'Cấu hình hệ thống',     icon: <Settings size={20} /> },
-    { id: 'complaints_logs',  label: 'Tranh chấp & Logs',     icon: <ShieldAlert size={20} /> },
-    { id: 'withdrawals',      label: 'Duyệt rút tiền',        icon: <Wallet size={20} /> },
-    { id: 'chat',             label: 'Hỗ trợ khách hàng',     icon: <MessageSquare size={20} /> },
+    { id: 'reports', label: 'Báo cáo doanh thu', icon: <BarChart3 size={20} /> },
+    { id: 'users', label: 'Khách hàng', icon: <Users size={20} /> },
+    { id: 'shops', label: 'Cửa hàng (Shops)', icon: <Store size={20} /> },
+    { id: 'costumes', label: 'Trang phục', icon: <Shirt size={20} /> },
+    { id: 'orders', label: 'Đơn đặt thuê', icon: <ShoppingBag size={20} /> },
+    { id: 'categories', label: 'Danh mục', icon: <Tags size={20} /> },
+    { id: 'config', label: 'Cấu hình hệ thống', icon: <Settings size={20} /> },
+    { id: 'complaints_logs', label: 'Tranh chấp & Logs', icon: <ShieldAlert size={20} /> },
+    { id: 'withdrawals', label: 'Duyệt rút tiền', icon: <Wallet size={20} /> },
+    { id: 'chat', label: 'Hỗ trợ khách hàng', icon: <MessageSquare size={20} /> },
   ];
 
   return (
@@ -270,8 +326,7 @@ const AdminDashboard = () => {
           </div>
         </section>
 
-
-        {/* ── TAB 1: REPORTS ── */}
+        {/* TAB 1: REPORTS */}
         {activeTab === 'reports' && (
           <div style={{ display: 'grid', gap: '24px' }}>
             <section className="admin-stat-grid">
@@ -357,7 +412,7 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* ── TAB 2: CUSTOMERS ── */}
+        {/* TAB 2: CUSTOMERS */}
         {activeTab === 'users' && (
           <section className="card admin-table-card">
             <div className="section-heading compact-heading">
@@ -387,7 +442,7 @@ const AdminDashboard = () => {
           </section>
         )}
 
-        {/* ── TAB 3: SHOPS ── */}
+        {/* TAB 3: SHOPS */}
         {activeTab === 'shops' && (
           <section className="card admin-table-card">
             <div className="section-heading compact-heading">
@@ -401,7 +456,11 @@ const AdminDashboard = () => {
                   <div className="user-list-item" style={{ padding: '16px' }} key={s._id}>
                     {s.lenderProfile?.logoUrl
                       ? <img src={s.lenderProfile.logoUrl} alt="Logo" style={{ width: '44px', height: '44px', borderRadius: '14px', objectFit: 'cover' }} />
-                      : <div className="user-avatar" style={{ background: 'var(--accent)' }}>🏬</div>
+                      : (
+                        <div className="user-avatar" style={{ background: 'var(--surface-soft)', display: 'grid', placeItems: 'center' }}>
+                          <Store size={22} style={{ color: '#9ca3af' }} />
+                        </div>
+                      )
                     }
                     <div>
                       <strong style={{ fontSize: '1.05rem' }}>{s.fullName}</strong>
@@ -433,7 +492,7 @@ const AdminDashboard = () => {
           </section>
         )}
 
-        {/* ── TAB 4: COSTUMES ── */}
+        {/* TAB 4: COSTUMES */}
         {activeTab === 'costumes' && (
           <section className="card admin-table-card">
             <div className="section-heading compact-heading">
@@ -443,20 +502,23 @@ const AdminDashboard = () => {
             <div className="table-list">
               {costumes.map((p) => {
                 const isLocked = p.status === 'hidden';
-                // ── FIX: backend populate field là "lender", không phải "shop" ──
                 const shopName = p.shop?.fullName || p.lender?.lenderName || p.lender?.user?.fullName || 'N/A';
                 return (
                   <div className="table-row" style={{ padding: '16px', gridTemplateColumns: 'auto 1fr auto' }} key={p._id}>
                     {p.images && p.images.length > 0
                       ? <img src={p.images[0]?.url || p.images[0]} alt={p.name} style={{ width: '54px', height: '54px', borderRadius: '10px', objectFit: 'cover' }} />
-                      : <div style={{ width: '54px', height: '54px', borderRadius: '10px', background: 'var(--surface-soft)', display: 'grid', placeItems: 'center' }}><Shirt size={22} style={{ color: '#6b7280' }} /></div>
+                      : <div style={{ width: '54px', height: '54px', borderRadius: '10px', background: 'var(--surface-soft)', display: 'grid', placeItems: 'center' }}><Shirt size={22} style={{ color: '#9ca3af' }} /></div>
                     }
                     <div style={{ marginLeft: '12px' }}>
                       <strong style={{ color: 'var(--primary-strong)' }}>{p.name}</strong>
                       <p style={{ color: 'var(--muted)', fontSize: '0.82rem', marginTop: '2px' }}>
                         Cửa hàng: <strong>{shopName}</strong> • Giá thuê: <strong>{money(p.rentalPricePerDay)} đ/ngày</strong> • Size: {p.sizes?.join(', ')}
                       </p>
-                      {isLocked && <span style={{ color: 'var(--danger)', fontSize: '0.78rem', fontWeight: '800', display: 'inline-flex', alignItems: 'center' }}><AlertTriangle size={14} style={{ color: '#6b7280', marginRight: '4px' }} /> ĐÃ KHÓA SẢN PHẨM (Vi phạm tiêu chuẩn)</span>}
+                      {isLocked && (
+                        <span style={{ color: 'var(--danger)', fontSize: '0.78rem', fontWeight: '800', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <AlertTriangle size={14} style={{ color: '#ef4444' }} /> ĐÃ KHÓA SẢN PHẨM (Vi phạm tiêu chuẩn)
+                        </span>
+                      )}
                     </div>
                     <button onClick={() => handleLockProduct(p._id, !isLocked)} className={`button ${!isLocked ? 'danger' : ''}`} style={{ minHeight: '36px', fontSize: '0.82rem' }}>
                       {isLocked ? 'Mở khóa sản phẩm' : 'Khóa sản phẩm vi phạm'}
@@ -469,7 +531,7 @@ const AdminDashboard = () => {
           </section>
         )}
 
-        {/* ── TAB 5: ORDERS ── */}
+        {/* TAB 5: ORDERS */}
         {activeTab === 'orders' && (
           <section className="card admin-table-card">
             <div className="section-heading compact-heading">
@@ -480,10 +542,8 @@ const AdminDashboard = () => {
               {orders.map((o) => (
                 <div className="table-row admin-order-row" style={{ padding: '16px', gridTemplateColumns: '1fr auto auto' }} key={o._id}>
                   <div>
-                    {/* ── FIX: dùng _productName đã normalize ── */}
                     <strong style={{ fontSize: '1.05rem', color: 'var(--primary-strong)' }}>{o._productName}</strong>
                     <p style={{ color: 'var(--muted)', fontSize: '0.82rem', marginTop: '3px' }}>
-                      {/* ── FIX: dùng o.shop và o.user đã normalize ── */}
                       Shop: <strong>{o.shop?.fullName || 'N/A'}</strong> • Khách: <strong>{o.user?.fullName || 'N/A'}</strong> • Tổng: <strong>{money(o.totalAmount)} đ</strong>
                     </p>
                     <p style={{ fontSize: '0.78rem', color: 'var(--muted)', marginTop: '2px' }}>
@@ -508,7 +568,7 @@ const AdminDashboard = () => {
           </section>
         )}
 
-        {/* ── TAB 6: CATEGORIES ── */}
+        {/* TAB 6: CATEGORIES */}
         {activeTab === 'categories' && (
           <section className="card">
             <div className="section-heading compact-heading">
@@ -521,15 +581,15 @@ const AdminDashboard = () => {
             </form>
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               {categories.map((c, idx) => (
-                <span key={idx} style={{ background: 'var(--surface-soft)', padding: '8px 16px', borderRadius: '12px', fontWeight: '800', fontSize: '0.9rem', textTransform: 'capitalize', border: '1px solid var(--border)' }}>
-                  🏷 {c}
+                <span key={idx} style={{ background: 'var(--surface-soft)', padding: '8px 16px', borderRadius: '12px', fontWeight: '800', fontSize: '0.9rem', textTransform: 'capitalize', border: '1px solid var(--border)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <Tags size={14} style={{ color: '#9ca3af' }} /> {c}
                 </span>
               ))}
             </div>
           </section>
         )}
 
-        {/* ── TAB 7: CONFIG ── */}
+        {/* TAB 7: CONFIG */}
         {activeTab === 'config' && (
           <section className="card">
             <div className="section-heading compact-heading">
@@ -574,7 +634,7 @@ const AdminDashboard = () => {
           </section>
         )}
 
-        {/* ── TAB 8: COMPLAINTS & LOGS ── */}
+        {/* TAB 8: COMPLAINTS & LOGS */}
         {activeTab === 'complaints_logs' && (
           <div className="admin-section-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
             <article className="card admin-table-card">
@@ -596,8 +656,8 @@ const AdminDashboard = () => {
                     <div style={{ fontSize: '0.78rem', color: 'var(--danger)', marginTop: '4px' }}>Yêu cầu đền bù: {money(d.requestedAmount)} đ</div>
                     {d.resolution ? (
                       <div style={{ marginTop: '10px', background: '#ecfdf5', padding: '8px', borderRadius: '8px', fontSize: '0.8rem', border: '1px solid #bbf7d0', color: '#166534' }}>
-                        <strong>Quyết định:</strong> {d.resolution.adminDecision}<br/>
-                        Đền bù cho Shop: {money(d.resolution.amountAwardedToLender)} đ<br/>
+                        <strong>Quyết định:</strong> {d.resolution.adminDecision}<br />
+                        Đền bù cho Shop: {money(d.resolution.amountAwardedToLender)} đ<br />
                         Hoàn lại cho Khách: {money(d.resolution.amountRefundedToRenter)} đ
                       </div>
                     ) : (
@@ -635,7 +695,7 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* ── TAB: WITHDRAWALS ── */}
+        {/* TAB: WITHDRAWALS */}
         {activeTab === 'withdrawals' && (
           <section className="card admin-table-card">
             <div className="section-heading compact-heading">
@@ -692,9 +752,30 @@ const AdminDashboard = () => {
                       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                         {w.status === 'pending' && (
                           <>
-                            <button onClick={() => handleProcessWithdrawal(w._id, 'processing')} className="primary-button" style={{ minHeight: '34px', fontSize: '0.8rem', padding: '0 14px' }}>Bắt đầu chuyển</button>
-                            <button onClick={() => handleProcessWithdrawal(w._id, 'rejected')} className="button danger" style={{ minHeight: '34px', fontSize: '0.8rem', padding: '0 14px' }}>Từ chối</button>
+                            <button
+                              onClick={() => handleProcessWithdrawal(w._id, 'processing')}
+                              className="primary-button"
+                              style={{ minHeight: '34px', fontSize: '0.8rem', padding: '0 14px' }}
+                            >
+                              Bắt đầu chuyển
+                            </button>
+                            <button
+                              onClick={() => handleProcessWithdrawal(w._id, 'rejected')}
+                              className="button danger"
+                              style={{ minHeight: '34px', fontSize: '0.8rem', padding: '0 14px' }}
+                            >
+                              Từ chối
+                            </button>
                           </>
+                        )}
+                        {w.status === 'processing' && (
+                          <button
+                            onClick={() => handleProcessWithdrawal(w._id, 'rejected')}
+                            className="button danger"
+                            style={{ minHeight: '34px', fontSize: '0.8rem', padding: '0 14px' }}
+                          >
+                            Từ chối
+                          </button>
                         )}
                         <button
                           className="button"
@@ -704,30 +785,16 @@ const AdminDashboard = () => {
                           {visibleWithdrawalQr === w._id ? 'Ẩn QR' : 'Xem QR'}
                         </button>
                       </div>
+
                       {w.status === 'processing' && (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
-                          <small style={{ color: 'var(--primary-strong)', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                            <Clock size={12} style={{ color: '#6b7280' }} /> Đang chờ Casso xác nhận...
-                          </small>
-                          <button
-                            onClick={async () => {
-                              try {
-                                const response = await api.get(`/wallet/debug/test-webhook-withdrawal?orderCode=${w.orderCode}`);
-                                if (response.data?.success) {
-                                  toast.success('Mô phỏng Casso chuyển tiền thành công!');
-                                  loadData();
-                                } else {
-                                  toast.error(response.data?.message || 'Có lỗi khi mô phỏng');
-                                }
-                              } catch (e) {
-                                toast.error('Lỗi kết nối: ' + e.message);
-                              }
-                            }}
-                            className="button"
-                            style={{ minHeight: '28px', fontSize: '0.72rem', padding: '0 8px', background: '#ecfdf5', color: '#166534', border: '1px solid #bbf7d0', cursor: 'pointer' }}
-                          >
-                            Mô phỏng Casso chuyển thành công
-                          </button>
+                        <div style={{
+                          fontSize: '0.7rem',
+                          color: '#6b7280',
+                          background: '#fef3c7',
+                          padding: '6px 10px',
+                          borderRadius: '6px'
+                        }}>
+                          Hệ thống sẽ tự động cập nhật trạng thái
                         </div>
                       )}
                     </div>
@@ -757,7 +824,7 @@ const AdminDashboard = () => {
           </section>
         )}
 
-        {/* ── TAB 9: CHAT ── */}
+        {/* TAB 9: CHAT */}
         {activeTab === 'chat' && (
           <div className="card">
             <div className="section-heading compact-heading">
@@ -781,8 +848,8 @@ const AdminDashboard = () => {
                 {selectedConvId ? (
                   <ChatBox conversationId={selectedConvId} />
                 ) : (
-                  <div className="empty-state" style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '60px' }}>
-                    <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '15px' }}>💬</span>
+                  <div className="empty-state" style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '60px' }}>
+                    <MessageSquare size={48} style={{ color: '#d1d5db', marginBottom: '15px' }} />
                     <h3>Chọn một khách hàng ở danh sách bên</h3>
                     <p style={{ color: 'var(--muted)', marginTop: '5px' }}>Bắt đầu cuộc trò chuyện hỗ trợ kỹ thuật hoặc giải quyết khiếu nại.</p>
                   </div>
@@ -793,7 +860,7 @@ const AdminDashboard = () => {
         )}
       </main>
 
-      {/* ── MODAL: SHOP DETAIL ── */}
+      {/* MODAL: SHOP DETAIL */}
       {selectedShop && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(8px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '20px' }}>
           <div className="card" style={{ width: 'min(580px, 100%)', maxHeight: '90vh', overflowY: 'auto', background: 'white', borderRadius: '26px', padding: '30px', position: 'relative' }}>
@@ -801,7 +868,11 @@ const AdminDashboard = () => {
             <div style={{ display: 'flex', gap: '15px', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border)', paddingBottom: '15px' }}>
               {selectedShop.lenderProfile?.logoUrl
                 ? <img src={selectedShop.lenderProfile.logoUrl} alt="Logo" style={{ width: '64px', height: '64px', borderRadius: '18px', objectFit: 'cover' }} />
-                : <div style={{ width: '64px', height: '64px', borderRadius: '18px', background: 'var(--surface-soft)', display: 'grid', placeItems: 'center', fontSize: '2rem' }}>🏬</div>
+                : (
+                  <div style={{ width: '64px', height: '64px', borderRadius: '18px', background: 'var(--surface-soft)', display: 'grid', placeItems: 'center' }}>
+                    <Store size={28} style={{ color: '#9ca3af' }} />
+                  </div>
+                )
               }
               <div>
                 <h2 style={{ margin: 0 }}>{selectedShop.fullName}</h2>
@@ -826,7 +897,9 @@ const AdminDashboard = () => {
                   <div style={{ marginTop: '8px', border: '1px solid var(--border)', borderRadius: '14px', overflow: 'hidden', background: 'var(--surface-soft)', textAlign: 'center', padding: '10px' }}>
                     <img src={selectedShop.lenderProfile.businessLicenseUrl} alt="Giấy phép kinh doanh / CCCD" style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '10px', objectFit: 'contain' }} />
                     <div style={{ marginTop: '8px' }}>
-                      <a href={selectedShop.lenderProfile.businessLicenseUrl} target="_blank" rel="noreferrer" style={{ fontSize: '0.85rem', color: 'var(--accent)', fontWeight: '800', textDecoration: 'underline' }}>🔍 Xem ảnh kích thước lớn</a>
+                      <a href={selectedShop.lenderProfile.businessLicenseUrl} target="_blank" rel="noreferrer" style={{ fontSize: '0.85rem', color: 'var(--accent)', fontWeight: '800', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        <ExternalLink size={14} style={{ color: 'var(--accent)' }} /> Xem ảnh kích thước lớn
+                      </a>
                     </div>
                   </div>
                 </div>
@@ -842,14 +915,14 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* ── MODAL: RESOLVE DISPUTE ── */}
+      {/* MODAL: RESOLVE DISPUTE */}
       {resolvingDispute && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(8px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '20px' }}>
           <form onSubmit={handleResolveDispute} className="card" style={{ width: 'min(500px, 100%)', background: 'white', borderRadius: '24px', padding: '30px', position: 'relative' }}>
             <button type="button" onClick={() => setResolvingDispute(null)} style={{ position: 'absolute', top: '20px', right: '20px', width: '36px', height: '36px', borderRadius: '50%', background: 'var(--surface-soft)', border: '0', fontSize: '1.2rem', display: 'grid', placeItems: 'center' }}>×</button>
             <h2 style={{ margin: '0 0 15px' }}>Phân xử tranh chấp</h2>
             <p style={{ fontSize: '0.85rem', marginBottom: '15px' }}>
-              <strong>Đơn:</strong> {resolvingDispute.order?._id}<br/>
+              <strong>Đơn:</strong> {resolvingDispute.order?._id}<br />
               <strong>Cọc đang giữ:</strong> {money(resolvingDispute.order?.pricing?.depositFee)} đ
             </p>
             <div className="input-group">
@@ -874,7 +947,7 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* ── MODAL: ORDER DETAIL ── */}
+      {/* MODAL: ORDER DETAIL */}
       {selectedOrder && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(8px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '20px' }}>
           <div className="card" style={{ width: 'min(620px, 100%)', maxHeight: '90vh', overflowY: 'auto', background: 'white', borderRadius: '26px', padding: '30px', position: 'relative' }}>
@@ -886,13 +959,11 @@ const AdminDashboard = () => {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px', fontSize: '0.85rem' }}>
               <div>
                 <strong>Khách hàng:</strong>
-                {/* ── FIX: dùng selectedOrder.user đã normalize ── */}
                 <p style={{ margin: '4px 0' }}><strong>{selectedOrder.user?.fullName || 'N/A'}</strong></p>
                 <p style={{ margin: '2px 0', color: 'var(--muted)' }}>Email: {selectedOrder.user?.email || 'N/A'}</p>
               </div>
               <div>
                 <strong>Đối tác Shop:</strong>
-                {/* ── FIX: dùng selectedOrder.shop đã normalize ── */}
                 <p style={{ margin: '4px 0' }}><strong>{selectedOrder.shop?.fullName || 'N/A'}</strong></p>
                 <p style={{ margin: '2px 0', color: 'var(--muted)' }}>Email: {selectedOrder.shop?.email || 'N/A'}</p>
               </div>
