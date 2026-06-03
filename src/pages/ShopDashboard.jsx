@@ -12,8 +12,8 @@ import { connectSocket, disconnectSocket } from '../services/socket.js';
 import { getBalance, updateBankAccount, withdrawWallet, depositWallet, getTransactions } from '../services/wallet.js';
 import { QRCodeCanvas } from 'qrcode.react';
 import { getPlatformConfig } from '../services/platform.js';
-import { VIETNAM_BANKS } from '../constants/banks.js';
-import { LayoutDashboard, Shirt, ShoppingBag, BarChart3, Wallet, Store, Star, Bell, LogOut, Download } from 'lucide-react';
+import { VIETNAM_BANKS, VIETNAM_BANKS_MAP } from '../constants/banks.js';
+import { LayoutDashboard, Shirt, ShoppingBag, BarChart3, Wallet, Store, Star, Bell, LogOut, Download, AlertTriangle, Clock, Info, AlertCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 const money = (value) => Number(value || 0).toLocaleString('vi-VN');
@@ -78,7 +78,6 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
   const STANDARD_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Freesize'];
   const [customSize, setCustomSize] = useState('');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [selectedOrder, setSelectedOrder] = useState(null);
 
   // Operational Modal States
@@ -92,12 +91,11 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
   const [disputeReason, setDisputeReason] = useState('');
   const [disputeAmount, setDisputeAmount] = useState(0);
   const [newBusyDate, setNewBusyDate] = useState({ startDate: '', endDate: '', note: '' });
-  const [message, setMessage] = useState('');
   const [replyText, setReplyText] = useState({});
 
   // Wallet States
   const [wallet, setWallet] = useState(null);
-  const [bankForm, setBankForm] = useState({ bankName: '', accountNumber: '', accountHolderName: '' });
+  const [bankForm, setBankForm] = useState({ bin: '', bankName: '', accountNumber: '', accountHolderName: '' });
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [platformConfig, setPlatformConfig] = useState(null);
   const [depositAmount, setDepositAmount] = useState('');
@@ -131,7 +129,11 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
       if (walletData) {
         setWallet(walletData);
         if (walletData.bankAccount) {
-          setBankForm(walletData.bankAccount);
+          const bankAcc = { ...walletData.bankAccount };
+          if (!bankAcc.bin && bankAcc.bankName) {
+            bankAcc.bin = VIETNAM_BANKS_MAP[bankAcc.bankName] || '';
+          }
+          setBankForm(bankAcc);
         }
       }
       if (configData) {
@@ -141,7 +143,7 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
         setTransactions(txData.data || []);
       }
     } catch (err) {
-      setError('Lỗi khi tải dữ liệu cửa hàng.');
+      toast.error('Lỗi khi tải dữ liệu cửa hàng.');
     }
   };
 
@@ -152,7 +154,7 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
     const socket = connectSocket();
     if (socket) {
       socket.on('new_order', (data) => {
-        setMessage(`Bạn vừa có đơn thuê mới: ${data.productName} (Đã thanh toán cọc)`);
+        toast.success(`Bạn vừa có đơn thuê mới: ${data.productName} (Đã thanh toán cọc)`);
         loadData(); // Cập nhật lại dữ liệu Dashboard tự động
       });
       socket.on('wallet_updated', (data) => {
@@ -160,7 +162,7 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
         if (data.status === 'completed') {
           setQrCode(null);
           setPendingTxId(null);
-          setMessage('Ting ting! Số dư ví của bạn vừa được cộng thêm ' + money(data.amount) + ' đ');
+          toast.success('Ting ting! Số dư ví của bạn vừa được cộng thêm ' + money(data.amount) + ' đ');
           getTransactions().then(txData => setTransactions(txData?.data || []));
         }
       });
@@ -174,49 +176,46 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
   const handleBankSubmit = async (e) => {
     e.preventDefault();
     try {
-      setMessage(''); setError('');
       await updateBankAccount(bankForm);
-      setMessage('Đã cập nhật thông tin ngân hàng thành công.');
+      toast.success('Đã cập nhật thông tin ngân hàng thành công.');
       loadData();
     } catch (err) {
-      setError('Lỗi cập nhật ngân hàng: ' + (err?.response?.data?.message || err.message));
+      toast.error('Lỗi cập nhật ngân hàng: ' + (err?.response?.data?.message || err.message));
     }
   };
 
   const handleWithdraw = async (e) => {
     e.preventDefault();
     if (!withdrawAmount || Number(withdrawAmount) < 50000) {
-      return setError('Số tiền rút tối thiểu là 50,000 đ');
+      return toast.error('Số tiền rút tối thiểu là 50,000 đ');
     }
     try {
-      setMessage(''); setError('');
       await withdrawWallet(Number(withdrawAmount));
-      setMessage('Đã gửi yêu cầu rút tiền thành công. Admin sẽ duyệt trong 24h.');
+      toast.success('Đã gửi yêu cầu rút tiền thành công. Admin sẽ duyệt trong 24h.');
       setWithdrawAmount('');
       loadData();
     } catch (err) {
-      setError('Lỗi rút tiền: ' + (err?.response?.data?.message || err.message));
+      toast.error('Lỗi rút tiền: ' + (err?.response?.data?.message || err.message));
     }
   };
 
   const handleDeposit = async (e) => {
     e.preventDefault();
     if (!depositAmount || Number(depositAmount) < 10000) {
-      return setError('Số tiền nạp tối thiểu là 10.000 đ');
+      return toast.error('Số tiền nạp tối thiểu là 10.000 đ');
     }
     try {
-      setMessage(''); setError('');
       const res = await depositWallet(Number(depositAmount));
       if (res.qrString) {
         setQrCode(res.qrString);
         setOrderCode(res.orderCode);
         setPendingTxId(res.transactionId);
-        setMessage('Vui lòng dùng ứng dụng ngân hàng quét mã QR để chuyển khoản thanh toán.');
+        toast.success('Vui lòng dùng ứng dụng ngân hàng quét mã QR để chuyển khoản thanh toán.');
       }
       setDepositAmount('');
       loadData();
     } catch (err) {
-      setError('Lỗi tạo yêu cầu nạp tiền: ' + (err?.response?.data?.message || err.message));
+      toast.error('Lỗi tạo yêu cầu nạp tiền: ' + (err?.response?.data?.message || err.message));
     }
   };
 
@@ -261,7 +260,6 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
     if (!files.length) return;
 
     setIsUploadingImages(true);
-    setError('');
 
     try {
       const newUrls = [];
@@ -278,7 +276,7 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
         images: [...(Array.isArray(prev.images) ? prev.images : []), ...newUrls]
       }));
     } catch (err) {
-      setError('Lỗi tải ảnh lên: ' + (err?.response?.data?.message || err.message));
+      toast.error('Lỗi tải ảnh lên: ' + (err?.response?.data?.message || err.message));
     } finally {
       setIsUploadingImages(false);
       e.target.value = null;
@@ -295,9 +293,6 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
   const handleProductSubmit = async (e) => {
     e.preventDefault();
     try {
-      setMessage('');
-      setError('');
-
       const payload = {
         ...productForm,
         ownerType: 'lender',
@@ -310,10 +305,10 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
 
       if (editingProductId) {
         await updateProduct(editingProductId, payload);
-        setMessage('Đã cập nhật trang phục thành công.');
+        toast.success('Đã cập nhật trang phục thành công.');
       } else {
         await createProduct(payload);
-        setMessage('Đã thêm trang phục mới thành công.');
+        toast.success('Đã thêm trang phục mới thành công.');
       }
 
       setProductForm(emptyProduct);
@@ -321,7 +316,7 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
       setShowProductForm(false);
       loadData();
     } catch (err) {
-      setError(err?.response?.data?.message || 'Không thể lưu trang phục.');
+      toast.error(err?.response?.data?.message || 'Không thể lưu trang phục.');
     }
   };
 
@@ -347,13 +342,11 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
   const handleProductDelete = async (id) => {
     if (!window.confirm('Bạn có chắc chắn muốn ẩn trang phục này khỏi cửa hàng không?')) return;
     try {
-      setMessage('');
-      setError('');
       await deleteProduct(id);
-      setMessage('Đã ẩn sản phẩm thành công.');
+      toast.success('Đã ẩn sản phẩm thành công.');
       loadData();
     } catch (err) {
-      setError('Lỗi khi ẩn sản phẩm.');
+      toast.error('Lỗi khi ẩn sản phẩm.');
     }
   };
 
@@ -374,10 +367,10 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
 
       await updateProduct(productId, { unavailableDates: updatedBusy });
       setNewBusyDate({ startDate: '', endDate: '', note: '' });
-      setMessage('Đã cập nhật lịch bận cho trang phục.');
+      toast.success('Đã cập nhật lịch bận cho trang phục.');
       loadData();
     } catch (err) {
-      setError('Không thể cập nhật lịch bận.');
+      toast.error('Không thể cập nhật lịch bận.');
     }
   };
 
@@ -387,23 +380,21 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
     try {
       const updatedBusy = (product.unavailableDates || []).filter((_, i) => i !== idx);
       await updateProduct(productId, { unavailableDates: updatedBusy });
-      setMessage('Đã xóa lịch bận thành công.');
+      toast.success('Đã xóa lịch bận thành công.');
       loadData();
     } catch (err) {
-      setError('Không thể cập nhật lịch bận.');
+      toast.error('Không thể cập nhật lịch bận.');
     }
   };
 
   const handleStatusChange = async (orderId, newStatus) => {
     try {
-      setMessage('');
-      setError('');
       await updateOrderStatus(orderId, newStatus);
-      setMessage('Đã cập nhật trạng thái đơn đặt.');
+      toast.success('Đã cập nhật trạng thái đơn đặt.');
       if (selectedOrder) setSelectedOrder(prev => ({ ...prev, status: newStatus }));
       loadData();
     } catch (err) {
-      setError(err?.response?.data?.message || 'Lỗi khi cập nhật trạng thái đơn đặt.');
+      toast.error(err?.response?.data?.message || 'Lỗi khi cập nhật trạng thái đơn đặt.');
     }
   };
 
@@ -412,11 +403,11 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
     if (!text || !text.trim()) return;
     try {
       await replyToReview(reviewId, text);
-      setMessage('Đã gửi phản hồi đánh giá.');
+      toast.success('Đã gửi phản hồi đánh giá.');
       setReplyText(prev => ({ ...prev, [reviewId]: '' }));
       loadData();
     } catch (err) {
-      setError('Lỗi gửi phản hồi.');
+      toast.error('Lỗi gửi phản hồi.');
     }
   };
 
@@ -432,9 +423,6 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
   const handleProfileSubmit = async (e) => {
     e.preventDefault();
     try {
-      setMessage('');
-      setError('');
-
       const payload = {
         fullName: profileForm.fullName,
         lenderProfile: {
@@ -449,10 +437,10 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
 
       const updatedUser = await updateProfile(payload);
       localStorage.setItem('exe201-user', JSON.stringify(updatedUser));
-      setMessage('Đã cập nhật thông tin cửa hàng thành công.');
+      toast.success('Đã cập nhật thông tin cửa hàng thành công.');
       loadData();
     } catch (err) {
-      setError('Lỗi cập nhật thông tin.');
+      toast.error('Lỗi cập nhật thông tin.');
     }
   };
 
@@ -591,13 +579,10 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
           </div>
         </section>
 
-        {message && <div className="alert success-alert">{message}</div>}
-        {error && <div className="alert">{error}</div>}
-
         {wallet && platformConfig && wallet.balance < -(platformConfig.maxDebtLimit !== undefined ? platformConfig.maxDebtLimit : 5000000) && (
           <div className="alert" style={{ background: '#fef2f2', color: '#991b1b', border: '1px solid #fee2e2', padding: '20px', borderRadius: '14px', marginBottom: '20px', boxShadow: '0 4px 15px rgba(220, 38, 38, 0.08)' }}>
             <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-              <span style={{ fontSize: '1.6rem', lineHeight: 1 }}>⚠️</span>
+              <AlertTriangle size={24} style={{ color: '#b91c1c', flexShrink: 0 }} />
               <div>
                 <strong style={{ display: 'block', fontSize: '1.05rem', marginBottom: '6px' }}>CỬA HÀNG ĐANG TẠM NGƯNG HOẠT ĐỘNG (BỊ KHÓA DO NỢ PHÍ SÀN)</strong>
                 <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: '1.5', opacity: 0.9 }}>
@@ -606,15 +591,15 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                 <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', lineHeight: '1.5', opacity: 0.9 }}>
                   Hạn mức nợ phí sàn tối đa cho phép là <strong>-{money(platformConfig.maxDebtLimit !== undefined ? platformConfig.maxDebtLimit : 5000000)} đ</strong>. Vì đã vượt quá hạn mức nợ, toàn bộ sản phẩm của shop hiện đã bị ẩn khỏi trang chủ.
                 </p>
-                <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', lineHeight: '1.5', opacity: 0.9, fontWeight: 'bold' }}>
-                  💡 Vui lòng nạp tối thiểu {money(Math.abs(wallet.balance))} đ để số dư ví trở lại mức an toàn và kích hoạt lại cửa hàng ngay lập tức.
+                <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', lineHeight: '1.5', opacity: 0.9, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Info size={16} /> Vui lòng nạp tối thiểu {money(Math.abs(wallet.balance))} đ để số dư ví trở lại mức an toàn và kích hoạt lại cửa hàng ngay lập tức.
                 </p>
                 <button
                   onClick={() => { setActiveTab('revenue'); navigate('/shop/revenue'); }}
                   className="button"
                   style={{ marginTop: '12px', background: '#991b1b', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}
                 >
-                  Thanh toán nợ ngay ➔
+                  Thanh toán nợ ngay →
                 </button>
               </div>
             </div>
@@ -623,7 +608,9 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
 
         {user?.lenderProfile?.status === 'Pending' && (
           <div className="alert" style={{ background: '#fffbeb', color: '#b45309', border: '1px solid #fcd34d', marginBottom: '20px' }}>
-            <strong style={{ display: 'block', marginBottom: '5px' }}>⏳ Cửa hàng đang chờ duyệt</strong>
+            <strong style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '5px' }}>
+              <Clock size={16} /> Cửa hàng đang chờ duyệt
+            </strong>
             Tài khoản của bạn đã được ghi nhận. Vui lòng chờ Admin duyệt hồ sơ để bắt đầu kinh doanh. Trong lúc này, tính năng Đăng sản phẩm sẽ bị tạm khóa.
           </div>
         )}
@@ -874,7 +861,7 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                   {p.images && p.images.length > 0 ? (
                     <img src={p.images[0]?.url || p.images[0]} alt={p.name} style={{ width: '60px', height: '60px', borderRadius: '10px', objectFit: 'cover' }} />
                   ) : (
-                    <div style={{ width: '60px', height: '60px', borderRadius: '10px', background: 'var(--surface-soft)', display: 'grid', placeItems: 'center' }}>👗</div>
+                    <div style={{ width: '60px', height: '60px', borderRadius: '10px', background: 'var(--surface-soft)', display: 'grid', placeItems: 'center' }}><Shirt size={24} style={{ color: '#6b7280' }} /></div>
                   )}
                   <div style={{ marginLeft: '15px' }}>
                     <strong style={{ fontSize: '1.1rem', color: 'var(--primary-strong)' }}>{p.name}</strong>
@@ -1043,7 +1030,7 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                   </h2>
                   {wallet?.balance < 0 && (
                     <div style={{ marginTop: '10px', background: 'rgba(239, 68, 68, 0.25)', display: 'inline-block', padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold', color: '#fca5a5' }}>
-                      ⚠️ Đang nợ phí dịch vụ: {money(Math.abs(wallet.balance))} đ
+                      <AlertTriangle size={14} style={{ color: '#fca5a5', display: 'inline-block', verticalAlign: 'middle', marginRight: '4px' }} /> Đang nợ phí dịch vụ: {money(Math.abs(wallet.balance))} đ
                     </div>
                   )}
                   <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '15px' }}>
@@ -1059,7 +1046,7 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                 </div>
 
                 <div style={{ marginTop: '15px', background: 'var(--surface-soft)', padding: '12px 15px', borderRadius: '12px', border: '1px solid var(--border)', fontSize: '0.82rem', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '8px', lineHeight: '1.4' }}>
-                  <span>ℹ️</span>
+                  <Info size={16} style={{ color: '#9ca3af', flexShrink: 0 }} />
                   <span>
                     Hạn mức nợ phí sàn tối đa cho phép: <strong>-{money(platformConfig?.maxDebtLimit !== undefined ? platformConfig.maxDebtLimit : 5000000)} đ</strong>. Cửa hàng sẽ bị khóa nếu số dư ví khả dụng âm vượt quá hạn mức này.
                   </span>
@@ -1085,9 +1072,9 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                       type="button"
                       onClick={() => setDepositAmount(Math.abs(wallet.balance).toString())}
                       className="button"
-                      style={{ width: '100%', marginBottom: '15px', color: '#991b1b', background: '#fef2f2', border: '1px solid #fee2e2', fontWeight: 'bold', padding: '10px', borderRadius: '8px', fontSize: '0.85rem' }}
+                      style={{ width: '100%', marginBottom: '15px', color: '#991b1b', background: '#fef2f2', border: '1px solid #fee2e2', fontWeight: 'bold', padding: '10px', borderRadius: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                     >
-                      💡 Tự động điền số tiền trả nợ: {money(Math.abs(wallet.balance))} đ
+                      <Info size={15} style={{ color: '#991b1b' }} /> Tự động điền số tiền trả nợ: {money(Math.abs(wallet.balance))} đ
                     </button>
                   )}
 
@@ -1107,8 +1094,8 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                         </p>
                       </div>
 
-                      <p style={{ marginTop: '15px', fontSize: '0.85rem', color: 'var(--muted)' }}>
-                        ⌛ Đang chờ thanh toán nhận diện...
+                      <p style={{ marginTop: '15px', fontSize: '0.85rem', color: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                        <Clock size={15} style={{ color: '#9ca3af' }} /> Đang chờ thanh toán nhận diện...
                       </p>
 
                       <button
@@ -1146,7 +1133,7 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                     <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '5px' }}>Tên Ngân hàng</label>
                     <select
                       value={bankForm.bankName}
-                      onChange={e => setBankForm({ ...bankForm, bankName: e.target.value })}
+                      onChange={e => setBankForm({ ...bankForm, bankName: e.target.value, bin: VIETNAM_BANKS_MAP[e.target.value] || '' })}
                       required
                       style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
                     >
@@ -1158,6 +1145,18 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                     <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '5px' }}>Mã BIN</label>
+                      <input
+                        type="text"
+                        placeholder="Tự động điền"
+                        value={bankForm.bin}
+                        onChange={e => setBankForm({ ...bankForm, bin: e.target.value })}
+                        maxLength="6"
+                        readOnly
+                        style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--muted)' }}
+                      />
+                    </div>
+                    <div>
                       <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '5px' }}>Số Tài khoản</label>
                       <input
                         placeholder="VD: 1029384756"
@@ -1167,16 +1166,16 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                         style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
                       />
                     </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '5px' }}>Tên Chủ Tài khoản</label>
-                      <input
-                        placeholder="VD: NGUYEN VAN A"
-                        value={bankForm.accountHolderName}
-                        onChange={e => setBankForm({ ...bankForm, accountHolderName: e.target.value.toUpperCase() })}
-                        required
-                        style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
-                      />
-                    </div>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '5px' }}>Tên Chủ Tài khoản</label>
+                    <input
+                      placeholder="VD: NGUYEN VAN A"
+                      value={bankForm.accountHolderName}
+                      onChange={e => setBankForm({ ...bankForm, accountHolderName: e.target.value.toUpperCase() })}
+                      required
+                      style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+                    />
                   </div>
                   <button type="submit" className="primary-button" style={{ marginTop: '10px' }}>Lưu thông tin</button>
                 </form>
@@ -1203,8 +1202,8 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
             </section>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '-10px' }}>
-              <button onClick={handlePrintReport} className="primary-button" style={{ display: 'inline-flex', gap: '8px' }}>
-                📄 Xuất báo cáo doanh thu đơn giản
+              <button onClick={handlePrintReport} className="primary-button" style={{ display: 'inline-flex', gap: '8px', alignItems: 'center' }}>
+                <Download size={16} /> Xuất báo cáo doanh thu đơn giản
               </button>
             </div>
 
@@ -1474,7 +1473,7 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                 >
                   <div>
                     <strong style={{ display: 'block', fontSize: '1rem', color: 'var(--primary-strong)' }}>
-                      {n.isRead ? '' : '🔵 '}{n.title}
+                      {!n.isRead && <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#9ca3af', marginRight: '6px', verticalAlign: 'middle' }}></span>}{n.title}
                     </strong>
                     <p style={{ margin: '4px 0 0', fontSize: '0.88rem', color: 'var(--muted)' }}>{n.body}</p>
                     <span style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginTop: '6px' }}>
@@ -1658,16 +1657,14 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
           <form onSubmit={async (e) => {
             e.preventDefault();
             try {
-              setError('');
-              setMessage('');
               const qrCodeToken = document.getElementById('checkInQrToken').value;
               const { checkInOrder } = await import('../services/orders.js');
               await checkInOrder(checkingInOrder._id, { qrCodeToken, images: checkInImages ? checkInImages.split(',') : [] });
-              setMessage('Check-in giao đồ thành công!');
+              toast.success('Check-in giao đồ thành công!');
               setCheckingInOrder(null);
               loadData();
             } catch (err) {
-              setError('Lỗi Check-in: ' + (err?.response?.data?.message || err.message));
+              toast.error('Lỗi Check-in: ' + (err?.response?.data?.message || err.message));
             }
           }} className="card" style={{
             width: 'min(450px, 100%)', background: 'white', borderRadius: '24px', padding: '30px', position: 'relative'
@@ -1717,15 +1714,13 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
           <form onSubmit={async (e) => {
             e.preventDefault();
             try {
-              setError('');
-              setMessage('');
               const { checkOutOrder } = await import('../services/orders.js');
               await checkOutOrder(checkingOutOrder._id, { images: checkOutImages ? checkOutImages.split(',') : [] });
-              setMessage('Check-out nhận lại đồ thành công! Cọc sẽ được hoàn tự động.');
+              toast.success('Check-out nhận lại đồ thành công! Cọc sẽ được hoàn tự động.');
               setCheckingOutOrder(null);
               loadData();
             } catch (err) {
-              setError('Lỗi Check-out: ' + (err?.response?.data?.message || err.message));
+              toast.error('Lỗi Check-out: ' + (err?.response?.data?.message || err.message));
             }
           }} className="card" style={{
             width: 'min(450px, 100%)', background: 'white', borderRadius: '24px', padding: '30px', position: 'relative'
@@ -1766,8 +1761,6 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
             e.preventDefault();
             if (!disputeReason) return;
             try {
-              setError('');
-              setMessage('');
               const { createDispute } = await import('../services/dispute.js');
               await createDispute({
                 orderId: disputingOrder._id,
@@ -1775,11 +1768,11 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                 description: 'Lender báo cáo sự cố khi nhận lại đồ.',
                 requestedAmount: disputeAmount
               });
-              setMessage('Đã gửi khiếu nại. Admin sẽ vào phân xử tiền cọc.');
+              toast.success('Đã gửi khiếu nại. Admin sẽ vào phân xử tiền cọc.');
               setDisputingOrder(null);
               loadData();
             } catch (err) {
-              setError('Lỗi khiếu nại: ' + (err?.response?.data?.message || err.message));
+              toast.error('Lỗi khiếu nại: ' + (err?.response?.data?.message || err.message));
             }
           }} className="card" style={{
             width: 'min(450px, 100%)', background: 'white', borderRadius: '24px', padding: '30px', position: 'relative'

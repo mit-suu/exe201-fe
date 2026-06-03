@@ -1,40 +1,46 @@
 import { useEffect, useState } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
-import { getBalance, getTransactions, updateBankAccount, depositWallet, withdrawWallet } from '../services/wallet.js';
+import { getBalance, getTransactions, getWithdrawalRequests, updateBankAccount, depositWallet, withdrawWallet } from '../services/wallet.js';
 import { getSocket, connectSocket, disconnectSocket } from '../services/socket.js';
-import { VIETNAM_BANKS } from '../constants/banks.js';
+import { VIETNAM_BANKS, VIETNAM_BANKS_MAP } from '../constants/banks.js';
+import { toast } from 'react-hot-toast';
+import { Clock, AlertTriangle, Check, X, ShieldAlert, AlertCircle, Info } from 'lucide-react';
 
 const money = (value) => Number(value || 0).toLocaleString('vi-VN');
 
 const MyWallet = () => {
   const [wallet, setWallet] = useState(null);
   const [transactions, setTransactions] = useState([]);
+  const [withdrawals, setWithdrawals] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [bankForm, setBankForm] = useState({ bankName: '', accountNumber: '', accountHolderName: '' });
+  const [bankForm, setBankForm] = useState({ bin: '', bankName: '', accountNumber: '', accountHolderName: '' });
   const [depositAmount, setDepositAmount] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [qrCode, setQrCode] = useState(null);
   const [orderCode, setOrderCode] = useState('');
   const [pendingTxId, setPendingTxId] = useState(null);
 
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
-
   const loadWallet = async (showLoading = true) => {
     try {
       if (showLoading) setLoading(true);
-      const [walletData, txData] = await Promise.all([
+      const [walletData, txData, withdrawalData] = await Promise.all([
         getBalance(),
-        getTransactions()
+        getTransactions(),
+        getWithdrawalRequests()
       ]);
       setWallet(walletData);
       setTransactions(txData?.data || []);
+      setWithdrawals(withdrawalData?.data || []);
       if (walletData?.bankAccount) {
-        setBankForm(walletData.bankAccount);
+        const bankAcc = { ...walletData.bankAccount };
+        if (!bankAcc.bin && bankAcc.bankName) {
+          bankAcc.bin = VIETNAM_BANKS_MAP[bankAcc.bankName] || '';
+        }
+        setBankForm(bankAcc);
       }
     } catch (err) {
-      setError('Lỗi tải thông tin ví.');
+      toast.error('Lỗi tải thông tin ví.');
     } finally {
       setLoading(false);
     }
@@ -65,7 +71,7 @@ const MyWallet = () => {
         if (data.status === 'completed') {
           setQrCode(null);
           setPendingTxId(null);
-          setMessage('Ting ting! Số dư của bạn vừa được cộng thêm ' + money(data.amount) + ' đ');
+          toast.success('Ting ting! Số dư của bạn vừa được cộng thêm ' + money(data.amount) + ' đ');
           // Reload giao dịch để hiển thị lịch sử mới nhất
           getTransactions().then(txData => setTransactions(txData?.data || []));
         }
@@ -81,52 +87,49 @@ const MyWallet = () => {
   const handleBankSubmit = async (e) => {
     e.preventDefault();
     try {
-      setMessage(''); setError('');
       await updateBankAccount(bankForm);
-      setMessage('Đã cập nhật thông tin ngân hàng thành công.');
+      toast.success('Đã cập nhật thông tin ngân hàng thành công.');
       loadWallet();
     } catch (err) {
-      setError('Lỗi cập nhật ngân hàng: ' + (err?.response?.data?.message || err.message));
+      toast.error('Lỗi cập nhật ngân hàng: ' + (err?.response?.data?.message || err.message));
     }
   };
 
   const handleDeposit = async (e) => {
     e.preventDefault();
     if (!depositAmount || Number(depositAmount) < 10000) {
-      return setError('Số tiền nạp tối thiểu là 10,000 đ');
+      return toast.error('Số tiền nạp tối thiểu là 10,000 đ');
     }
     try {
-      setMessage(''); setError('');
       const res = await depositWallet(Number(depositAmount));
       if (res.qrString) {
         setQrCode(res.qrString);
         setOrderCode(res.orderCode);
         setPendingTxId(res.transactionId);
-        setMessage('Vui lòng dùng ứng dụng ngân hàng quét mã QR. Hệ thống sẽ tự động nhận diện khi bạn chuyển xong.');
+        toast.success('Vui lòng dùng ứng dụng ngân hàng quét mã QR. Hệ thống sẽ tự động nhận diện khi bạn chuyển xong.');
       }
       setDepositAmount('');
       loadWallet(false);
     } catch (err) {
-      setError('Lỗi tạo yêu cầu nạp tiền: ' + (err?.response?.data?.message || err.message));
+      toast.error('Lỗi tạo yêu cầu nạp tiền: ' + (err?.response?.data?.message || err.message));
     }
   };
 
   const handleWithdraw = async (e) => {
     e.preventDefault();
     if (!withdrawAmount || Number(withdrawAmount) < 10000) {
-      return setError('Số tiền rút tối thiểu là 10,000 đ');
+      return toast.error('Số tiền rút tối thiểu là 10,000 đ');
     }
     if (!wallet?.bankAccount?.accountNumber) {
-      return setError('Vui lòng cập nhật thông tin tài khoản ngân hàng trước khi rút tiền.');
+      return toast.error('Vui lòng cập nhật thông tin tài khoản ngân hàng trước khi rút tiền.');
     }
     try {
-      setMessage(''); setError('');
       await withdrawWallet(Number(withdrawAmount));
-      setMessage('Đã gửi yêu cầu rút tiền thành công. Admin sẽ xử lý trong vòng 24h.');
+      toast.success('Đã gửi yêu cầu rút tiền thành công. Admin sẽ xử lý trong vòng 24h.');
       setWithdrawAmount('');
       loadWallet();
     } catch (err) {
-      setError('Lỗi rút tiền: ' + (err?.response?.data?.message || err.message));
+      toast.error('Lỗi rút tiền: ' + (err?.response?.data?.message || err.message));
     }
   };
 
@@ -135,9 +138,6 @@ const MyWallet = () => {
   return (
     <div style={{ maxWidth: '1000px', margin: '40px auto', padding: '0 20px', minHeight: '60vh' }}>
       <h1 style={{ marginBottom: '30px' }}>Ví của tôi (BuildLab Wallet)</h1>
-
-      {message && <div className="alert success-alert" style={{ marginBottom: '20px' }}>{message}</div>}
-      {error && <div className="alert" style={{ marginBottom: '20px' }}>{error}</div>}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', marginBottom: '40px' }}>
         {/* Số dư ví */}
@@ -227,7 +227,7 @@ const MyWallet = () => {
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '5px' }}>Tên Ngân hàng</label>
               <select
                 value={bankForm.bankName}
-                onChange={e => setBankForm({ ...bankForm, bankName: e.target.value })}
+                onChange={e => setBankForm({ ...bankForm, bankName: e.target.value, bin: VIETNAM_BANKS_MAP[e.target.value] || '' })}
                 required
                 style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card-bg)', color: 'var(--text)' }}
               >
@@ -236,6 +236,18 @@ const MyWallet = () => {
                   <option key={bank} value={bank}>{bank}</option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '5px' }}>Mã BIN (6 chữ số)</label>
+              <input
+                type="text"
+                placeholder="Tự động điền"
+                value={bankForm.bin}
+                onChange={e => setBankForm({ ...bankForm, bin: e.target.value })}
+                maxLength="6"
+                readOnly
+                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--muted)' }}
+              />
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '5px' }}>Số Tài khoản</label>
@@ -258,6 +270,96 @@ const MyWallet = () => {
             <button type="submit" className="primary-button">Lưu thông tin</button>
           </form>
         </div>
+
+        {/* Yêu cầu rút tiền */}
+        {withdrawals.length > 0 && (
+          <div className="card">
+            <h3 style={{ margin: '0 0 20px 0' }}>Lịch sử yêu cầu rút tiền</h3>
+            <div style={{ display: 'grid', gap: '15px' }}>
+              {withdrawals.map(w => (
+                <div key={w._id} style={{ 
+                  background: 'var(--surface-soft)', 
+                  padding: '16px', 
+                  borderRadius: '12px',
+                  borderLeft: `4px solid ${w.status === 'completed' ? 'var(--success)' : w.status === 'rejected' ? 'var(--danger)' : 'var(--warning)'}`
+                }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '16px', marginBottom: '12px' }}>
+                    <div>
+                      <p style={{ margin: '0 0 4px 0', fontSize: '0.85rem', fontWeight: 600 }}>
+                        Rút {money(w.amount)} đ
+                      </p>
+                      <p style={{ margin: '0 0 8px 0', fontSize: '0.78rem', color: 'var(--muted)' }}>
+                        {new Date(w.createdAt).toLocaleString('vi-VN')}
+                      </p>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '4px 12px',
+                        borderRadius: '16px',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        background: w.status === 'completed' ? 'var(--success-light)' : 
+                                   w.status === 'rejected' ? 'var(--danger-light)' : 
+                                   'var(--warning-light)',
+                        color: w.status === 'completed' ? 'var(--success-strong)' : 
+                               w.status === 'rejected' ? 'var(--danger-strong)' : 
+                               'var(--warning-strong)'
+                      }}>
+                        {w.status === 'completed' ? 'Hoàn tất' : 
+                         w.status === 'rejected' ? 'Từ chối' : 
+                         w.status === 'processing' ? 'Đang xử lý' : 
+                         'Chờ duyệt'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.82rem' }}>
+                    <div>
+                      <p style={{ margin: '0 0 2px 0', color: 'var(--muted)', fontSize: '0.75rem' }}>Ngân hàng</p>
+                      <p style={{ margin: 0, fontWeight: 600 }}>{w.bankAccount?.bankName}</p>
+                    </div>
+                    <div>
+                      <p style={{ margin: '0 0 2px 0', color: 'var(--muted)', fontSize: '0.75rem' }}>Số tài khoản</p>
+                      <p style={{ margin: 0, fontWeight: 600, fontFamily: 'monospace' }}>{w.bankAccount?.accountNumber}</p>
+                    </div>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <p style={{ margin: '0 0 2px 0', color: 'var(--muted)', fontSize: '0.75rem' }}>Chủ tài khoản</p>
+                      <p style={{ margin: 0, fontWeight: 600 }}>{w.bankAccount?.accountHolderName}</p>
+                    </div>
+                  </div>
+
+                  {w.status === 'processing' && (
+                    <div style={{ marginTop: '12px', padding: '10px', background: 'rgba(33, 150, 243, 0.1)', borderRadius: '8px', fontSize: '0.8rem', color: 'var(--primary-strong)', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <Clock size={15} style={{ flexShrink: 0 }} />
+                      <span>Admin đã bắt đầu chuyển khoản, hệ thống đang chờ ngân hàng xác nhận. Thường mất từ 5-30 phút.</span>
+                    </div>
+                  )}
+
+                  {w.status === 'pending' && (
+                    <div style={{ marginTop: '12px', padding: '10px', background: 'rgba(255, 193, 7, 0.1)', borderRadius: '8px', fontSize: '0.8rem', color: 'var(--warning-strong)', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <Info size={15} style={{ flexShrink: 0 }} />
+                      <span>Yêu cầu của bạn đang chờ admin duyệt và xử lý. Thường mất từ 1-24 giờ.</span>
+                    </div>
+                  )}
+
+                  {w.status === 'rejected' && w.rejectionReason && (
+                    <div style={{ marginTop: '12px', padding: '10px', background: 'rgba(220, 53, 69, 0.1)', borderRadius: '8px', fontSize: '0.8rem', color: 'var(--danger-strong)', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <AlertTriangle size={15} style={{ flexShrink: 0 }} />
+                      <span>Lý do từ chối: <strong>{w.rejectionReason}</strong></span>
+                    </div>
+                  )}
+
+                  {w.qrString && (
+                    <div style={{ marginTop: '12px', padding: '12px', background: 'white', borderRadius: '8px', textAlign: 'center', border: '1px solid var(--border)' }}>
+                      <p style={{ margin: '0 0 8px 0', fontSize: '0.78rem', color: 'var(--muted)' }}>Mã tham chiếu: <strong style={{ fontFamily: 'monospace' }}>{w.orderCode}</strong></p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Lịch sử giao dịch */}
         <div className="card">

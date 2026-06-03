@@ -4,11 +4,12 @@ import { clearSession } from '../services/auth.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { getAdminUsers, setUserStatus, approveLender, getAdminProducts, getAdminOrders, getAdminReports, getAllDisputes, resolveDispute, getAllWithdrawals, processWithdrawal } from '../services/admin.js';
 import { getPlatformConfig, updatePlatformConfig, getActivityLogs, getAdminBankInfo, updateAdminBankInfo } from '../services/platform.js';
+import { QRCodeCanvas } from 'qrcode.react';
 import { updateOrderStatus } from '../services/orders.js';
 import { updateProduct } from '../services/products.js';
 import ChatBox from '../components/ChatBox.jsx';
 import { getConversations } from '../services/chats.js';
-import { BarChart3, Users, Store, Shirt, ShoppingBag, Tags, Settings, ShieldAlert, Wallet, MessageSquare, LogOut } from 'lucide-react';
+import { BarChart3, Users, Store, Shirt, ShoppingBag, Tags, Settings, ShieldAlert, Wallet, MessageSquare, LogOut, AlertTriangle, Clock, Info } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 const money = (value) => Number(value || 0).toLocaleString('vi-VN');
@@ -65,6 +66,7 @@ const AdminDashboard = () => {
   const [selectedShop, setSelectedShop] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [resolvingDispute, setResolvingDispute] = useState(null);
+  const [visibleWithdrawalQr, setVisibleWithdrawalQr] = useState(null);
   const [resolutionForm, setResolutionForm] = useState({ adminDecision: '', amountAwardedToLender: 0, amountRefundedToRenter: 0 });
 
   const loadData = async () => {
@@ -94,7 +96,7 @@ const AdminDashboard = () => {
       setWithdrawals(withds || []);
       setLogs(activity || []);
     } catch (err) {
-      setError('Lỗi khi tải dữ liệu hệ thống.');
+      toast.error('Lỗi khi tải dữ liệu hệ thống.');
     }
   };
 
@@ -113,47 +115,43 @@ const AdminDashboard = () => {
 
   const handleToggleUserStatus = async (userId, currentActive) => {
     try {
-      setMessage(''); setError('');
       await setUserStatus(userId, !currentActive);
-      setMessage('Đã cập nhật trạng thái tài khoản.');
+      toast.success('Đã cập nhật trạng thái tài khoản.');
       loadData();
     } catch (err) {
-      setError('Không thể cập nhật trạng thái người dùng.');
+      toast.error('Không thể cập nhật trạng thái người dùng.');
     }
   };
 
   const handleApproveLender = async (lenderId, approved) => {
     try {
-      setMessage(''); setError('');
       await approveLender(lenderId, approved);
-      setMessage(approved ? 'Đã duyệt phê duyệt lender đăng ký.' : 'Đã từ chối lender đăng ký.');
+      toast.success(approved ? 'Đã duyệt phê duyệt lender đăng ký.' : 'Đã từ chối lender đăng ký.');
       setSelectedShop(null);
       loadData();
     } catch (err) {
-      setError('Lỗi xử lý duyệt lender.');
+      toast.error('Lỗi xử lý duyệt lender.');
     }
   };
 
   const handleLockProduct = async (productId, isLocked) => {
     try {
-      setMessage(''); setError('');
       await updateProduct(productId, { status: isLocked ? 'hidden' : 'available' });
-      setMessage(isLocked ? 'Đã khóa trang phục vi phạm thành công.' : 'Đã mở khóa trang phục.');
+      toast.success(isLocked ? 'Đã khóa trang phục vi phạm thành công.' : 'Đã mở khóa trang phục.');
       loadData();
     } catch (err) {
-      setError('Không thể khóa trang phục.');
+      toast.error('Không thể khóa trang phục.');
     }
   };
 
   const handleOverrideOrderStatus = async (orderId, newStatus) => {
     try {
-      setMessage(''); setError('');
       await updateOrderStatus(orderId, newStatus);
-      setMessage('Đã cập nhật trạng thái đơn hàng (Admin override).');
+      toast.success('Đã cập nhật trạng thái đơn hàng (Admin override).');
       if (selectedOrder) setSelectedOrder(prev => ({ ...prev, status: newStatus }));
       loadData();
     } catch (err) {
-      setError('Không thể thay đổi trạng thái đơn đặt.');
+      toast.error('Không thể thay đổi trạng thái đơn đặt.');
     }
   };
 
@@ -165,19 +163,18 @@ const AdminDashboard = () => {
     }
     setCategories([...categories, newCategory.trim().toLowerCase()]);
     setNewCategory('');
-    setMessage('Đã thêm danh mục mới.');
+    toast.success('Đã thêm danh mục mới.');
   };
 
   const handleSaveConfig = async (e) => {
     e.preventDefault();
     try {
-      setMessage(''); setError('');
       await updatePlatformConfig(platformConfig);
       await updateAdminBankInfo(adminBankInfo);
-      setMessage('Đã lưu cấu hình nền tảng và tài khoản ngân hàng.');
+      toast.success('Đã lưu cấu hình nền tảng và tài khoản ngân hàng.');
       loadData();
     } catch (err) {
-      setError('Lỗi khi lưu cấu hình: ' + (err?.response?.data?.message || err.message));
+      toast.error('Lỗi khi lưu cấu hình: ' + (err?.response?.data?.message || err.message));
     }
   };
 
@@ -185,14 +182,13 @@ const AdminDashboard = () => {
     e.preventDefault();
     if (!resolutionForm.adminDecision.trim()) return;
     try {
-      setMessage(''); setError('');
       await resolveDispute(resolvingDispute._id, resolutionForm);
-      setMessage('Đã giải quyết tranh chấp thành công.');
+      toast.success('Đã giải quyết tranh chấp thành công.');
       setResolvingDispute(null);
       setResolutionForm({ adminDecision: '', amountAwardedToLender: 0, amountRefundedToRenter: 0 });
       loadData();
     } catch (err) {
-      setError('Không thể giải quyết tranh chấp.');
+      toast.error('Không thể giải quyết tranh chấp.');
     }
   };
 
@@ -203,12 +199,11 @@ const AdminDashboard = () => {
       if (!rejectionReason) return;
     }
     try {
-      setMessage(''); setError('');
       await processWithdrawal(id, { status, rejectionReason });
-      setMessage('Đã xử lý yêu cầu rút tiền thành công.');
+      toast.success('Đã xử lý yêu cầu rút tiền thành công.');
       loadData();
     } catch (err) {
-      setError('Không thể xử lý yêu cầu rút tiền.');
+      toast.error('Không thể xử lý yêu cầu rút tiền.');
     }
   };
 
@@ -275,8 +270,6 @@ const AdminDashboard = () => {
           </div>
         </section>
 
-        {message && <div className="alert success-alert">{message}</div>}
-        {error   && <div className="alert">{error}</div>}
 
         {/* ── TAB 1: REPORTS ── */}
         {activeTab === 'reports' && (
@@ -456,14 +449,14 @@ const AdminDashboard = () => {
                   <div className="table-row" style={{ padding: '16px', gridTemplateColumns: 'auto 1fr auto' }} key={p._id}>
                     {p.images && p.images.length > 0
                       ? <img src={p.images[0]?.url || p.images[0]} alt={p.name} style={{ width: '54px', height: '54px', borderRadius: '10px', objectFit: 'cover' }} />
-                      : <div style={{ width: '54px', height: '54px', borderRadius: '10px', background: 'var(--surface-soft)', display: 'grid', placeItems: 'center' }}>👗</div>
+                      : <div style={{ width: '54px', height: '54px', borderRadius: '10px', background: 'var(--surface-soft)', display: 'grid', placeItems: 'center' }}><Shirt size={22} style={{ color: '#6b7280' }} /></div>
                     }
                     <div style={{ marginLeft: '12px' }}>
                       <strong style={{ color: 'var(--primary-strong)' }}>{p.name}</strong>
                       <p style={{ color: 'var(--muted)', fontSize: '0.82rem', marginTop: '2px' }}>
                         Cửa hàng: <strong>{shopName}</strong> • Giá thuê: <strong>{money(p.rentalPricePerDay)} đ/ngày</strong> • Size: {p.sizes?.join(', ')}
                       </p>
-                      {isLocked && <span style={{ color: 'var(--danger)', fontSize: '0.78rem', fontWeight: '800' }}>⚠️ ĐÃ KHÓA SẢN PHẨM (Vi phạm tiêu chuẩn)</span>}
+                      {isLocked && <span style={{ color: 'var(--danger)', fontSize: '0.78rem', fontWeight: '800', display: 'inline-flex', alignItems: 'center' }}><AlertTriangle size={14} style={{ color: '#6b7280', marginRight: '4px' }} /> ĐÃ KHÓA SẢN PHẨM (Vi phạm tiêu chuẩn)</span>}
                     </div>
                     <button onClick={() => handleLockProduct(p._id, !isLocked)} className={`button ${!isLocked ? 'danger' : ''}`} style={{ minHeight: '36px', fontSize: '0.82rem' }}>
                       {isLocked ? 'Mở khóa sản phẩm' : 'Khóa sản phẩm vi phạm'}
@@ -651,31 +644,112 @@ const AdminDashboard = () => {
             </div>
             <div className="table-list">
               {withdrawals.map((w) => (
-                <div className="table-row" style={{ padding: '16px', gridTemplateColumns: '1fr 1fr auto' }} key={w._id}>
-                  <div>
-                    <strong style={{ fontSize: '1.05rem' }}>{money(w.amount)} đ</strong>
-                    <p style={{ color: 'var(--muted)', fontSize: '0.82rem', marginTop: '2px' }}>
-                      Người yêu cầu: <strong>{w.user?.fullName}</strong> • {w.user?.email}
-                    </p>
-                    <p style={{ fontSize: '0.78rem', color: 'var(--muted)', marginTop: '2px' }}>{new Date(w.createdAt).toLocaleString('vi-VN')}</p>
+                <div className="table-row" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }} key={w._id}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
+                    <div>
+                      <p style={{ fontSize: '0.82rem', color: 'var(--muted)', margin: '0 0 8px 0' }}>
+                        Người yêu cầu: <strong>{w.user?.fullName}</strong> • {w.user?.email}
+                      </p>
+                      <p style={{ fontSize: '0.78rem', color: 'var(--muted)', margin: 0 }}>
+                        {new Date(w.createdAt).toLocaleString('vi-VN')}
+                      </p>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span className={`status-pill ${w.status === 'completed' ? 'active' : w.status === 'rejected' ? 'inactive' : 'warning'}`}>
+                        {w.status.toUpperCase()}
+                      </span>
+                    </div>
                   </div>
-                  <div style={{ fontSize: '0.85rem' }}>
-                    <p><strong>Ngân hàng:</strong> {w.bankAccount?.bankName}</p>
-                    <p><strong>Số TK:</strong> {w.bankAccount?.accountNumber}</p>
-                    <p><strong>Chủ TK:</strong> {w.bankAccount?.accountHolderName}</p>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-                    <span className={`status-pill ${w.status === 'completed' ? 'active' : w.status === 'rejected' ? 'inactive' : 'warning'}`}>
-                      {w.status.toUpperCase()}
-                    </span>
-                    {w.status === 'pending' && (
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <button onClick={() => handleProcessWithdrawal(w._id, 'completed')} className="primary-button" style={{ minHeight: '30px', fontSize: '0.75rem', padding: '0 10px' }}>Chuyển tiền OK</button>
-                        <button onClick={() => handleProcessWithdrawal(w._id, 'rejected')} className="button danger" style={{ minHeight: '30px', fontSize: '0.75rem', padding: '0 10px' }}>Từ chối</button>
+
+                  <div style={{ background: 'var(--surface-soft)', padding: '12px', borderRadius: '8px', border: '2px solid var(--primary)' }}>
+                    <p style={{ margin: '0 0 8px 0', fontSize: '0.8rem', color: 'var(--muted)', fontWeight: 600 }}>THÔNG TIN CHUYỂN KHOẢN</p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div>
+                        <p style={{ margin: '0 0 4px 0', fontSize: '0.75rem', color: 'var(--muted)' }}>Số tiền</p>
+                        <p style={{ margin: 0, fontSize: '1.3rem', fontWeight: 'bold', color: 'var(--primary-strong)' }}>{money(w.amount)} đ</p>
                       </div>
-                    )}
-                    {w.rejectionReason && <small style={{ color: 'var(--danger)' }}>Lý do: {w.rejectionReason}</small>}
+                      <div>
+                        <p style={{ margin: '0 0 4px 0', fontSize: '0.75rem', color: 'var(--muted)' }}>Mã tham chiếu</p>
+                        <p style={{ margin: 0, fontSize: '1rem', fontFamily: 'monospace', fontWeight: 'bold', color: 'var(--accent)' }}>{w.orderCode}</p>
+                      </div>
+                      <div>
+                        <p style={{ margin: '0 0 4px 0', fontSize: '0.75rem', color: 'var(--muted)' }}>Ngân hàng</p>
+                        <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600 }}>{w.bankAccount?.bankName}</p>
+                      </div>
+                      <div>
+                        <p style={{ margin: '0 0 4px 0', fontSize: '0.75rem', color: 'var(--muted)' }}>Số tài khoản</p>
+                        <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, fontFamily: 'monospace' }}>{w.bankAccount?.accountNumber}</p>
+                      </div>
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <p style={{ margin: '0 0 4px 0', fontSize: '0.75rem', color: 'var(--muted)' }}>Chủ tài khoản</p>
+                        <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600 }}>{w.bankAccount?.accountHolderName}</p>
+                      </div>
+                    </div>
                   </div>
+
+                  {(w.status === 'pending' || w.status === 'processing') && (
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        {w.status === 'pending' && (
+                          <>
+                            <button onClick={() => handleProcessWithdrawal(w._id, 'processing')} className="primary-button" style={{ minHeight: '34px', fontSize: '0.8rem', padding: '0 14px' }}>Bắt đầu chuyển</button>
+                            <button onClick={() => handleProcessWithdrawal(w._id, 'rejected')} className="button danger" style={{ minHeight: '34px', fontSize: '0.8rem', padding: '0 14px' }}>Từ chối</button>
+                          </>
+                        )}
+                        <button
+                          className="button"
+                          style={{ minHeight: '34px', fontSize: '0.8rem', padding: '0 14px' }}
+                          onClick={() => setVisibleWithdrawalQr(visibleWithdrawalQr === w._id ? null : w._id)}
+                        >
+                          {visibleWithdrawalQr === w._id ? 'Ẩn QR' : 'Xem QR'}
+                        </button>
+                      </div>
+                      {w.status === 'processing' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+                          <small style={{ color: 'var(--primary-strong)', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <Clock size={12} style={{ color: '#6b7280' }} /> Đang chờ Casso xác nhận...
+                          </small>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const response = await api.get(`/wallet/debug/test-webhook-withdrawal?orderCode=${w.orderCode}`);
+                                if (response.data?.success) {
+                                  toast.success('Mô phỏng Casso chuyển tiền thành công!');
+                                  loadData();
+                                } else {
+                                  toast.error(response.data?.message || 'Có lỗi khi mô phỏng');
+                                }
+                              } catch (e) {
+                                toast.error('Lỗi kết nối: ' + e.message);
+                              }
+                            }}
+                            className="button"
+                            style={{ minHeight: '28px', fontSize: '0.72rem', padding: '0 8px', background: '#ecfdf5', color: '#166534', border: '1px solid #bbf7d0', cursor: 'pointer' }}
+                          >
+                            Mô phỏng Casso chuyển thành công
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {visibleWithdrawalQr === w._id && w.qrString && (
+                    <div style={{ textAlign: 'center', background: '#fff', padding: '16px', borderRadius: '12px', border: '2px solid var(--border)' }}>
+                      <p style={{ margin: '0 0 12px 0', fontSize: '0.85rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
+                        <Info size={16} style={{ color: '#6b7280' }} /> Quét mã này để chuyển khoản
+                      </p>
+                      <div style={{ display: 'inline-block', background: 'white', padding: '8px', borderRadius: '8px' }}>
+                        <QRCodeCanvas value={w.qrString} size={150} level="M" />
+                      </div>
+                      <p style={{ margin: '12px 0 0 0', fontSize: '0.75rem', color: 'var(--muted)' }}>Nội dung: <strong>{w.orderCode}</strong></p>
+                    </div>
+                  )}
+
+                  {w.rejectionReason && (
+                    <div style={{ background: 'rgba(220, 53, 69, 0.1)', padding: '8px', borderRadius: '8px', borderLeft: '3px solid var(--danger)' }}>
+                      <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--danger)' }}>Lý do từ chối: {w.rejectionReason}</p>
+                    </div>
+                  )}
                 </div>
               ))}
               {withdrawals.length === 0 && <div className="empty-state">Không có yêu cầu rút tiền nào.</div>}

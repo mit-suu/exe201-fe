@@ -3,7 +3,7 @@ import StatusBadge from '../components/StatusBadge.jsx';
 import { getMyOrders, cancelOrder } from '../services/orders.js';
 import { getCurrentUser } from '../services/auth.js';
 import { createReview } from '../services/reviews.js';
-import { Copy } from 'lucide-react';
+import { Copy, FileText } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 const money = (value) => Number(value || 0).toLocaleString('vi-VN');
@@ -178,7 +178,9 @@ const OrderHistory = () => {
                       className="button"
                       style={{ minHeight: '38px', fontSize: '0.85rem' }}
                     >
-                      📄 Hợp đồng
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <FileText size={15} style={{ color: '#6b7280' }} /> Hợp đồng
+                      </span>
                     </button>
                   )}
                   {['pending', 'pending_payment'].includes(order.status) && (
