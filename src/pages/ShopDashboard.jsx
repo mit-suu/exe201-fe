@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StatusBadge from '../components/StatusBadge.jsx';
 import api from '../services/api.js';
-import { listShopProducts, createProduct, updateProduct, deleteProduct } from '../services/products.js';
-import { getShopOrders, getShopRevenue, updateOrderStatus } from '../services/orders.js';
-import { getShopReviews, replyToReview } from '../services/reviews.js';
+import { listLenderProducts, createProduct, updateProduct, deleteProduct } from '../services/products.js';
+import { getLenderOrders, getLenderRevenue, updateOrderStatus } from '../services/orders.js';
+import { getLenderReviews, replyToReview } from '../services/reviews.js';
 import { getMyNotifications, markNotificationRead } from '../services/notifications.js';
 import { updateProfile } from '../services/profile.js';
 import { clearSession } from '../services/auth.js';
@@ -114,10 +114,10 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
   const loadData = async () => {
     try {
       const [prodData, ordData, revData, revsData, notifData, walletData, configData, txData] = await Promise.all([
-        listShopProducts(),
-        getShopOrders(),
-        getShopRevenue(),
-        getShopReviews(),
+        listLenderProducts(),
+        getLenderOrders(),
+        getLenderRevenue(),
+        getLenderReviews(),
         getMyNotifications(),
         getBalance().catch(() => null),
         getPlatformConfig().catch(() => null),
