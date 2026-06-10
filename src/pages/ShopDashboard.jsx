@@ -6,7 +6,8 @@ import { listLenderProducts, createProduct, updateProduct, deleteProduct } from 
 import { getLenderOrders, getLenderRevenue, updateOrderStatus } from '../services/orders.js';
 import { getLenderReviews, replyToReview } from '../services/reviews.js';
 import { getMyNotifications, markNotificationRead } from '../services/notifications.js';
-import { updateProfile } from '../services/profile.js';
+import { getProfile, updateProfile, updateLenderProfile } from '../services/profile.js';
+import GoogleMapsPicker from '../components/GoogleMapsPicker.jsx';
 import { clearSession } from '../services/auth.js';
 import { connectSocket, disconnectSocket } from '../services/socket.js';
 import { getBalance, updateBankAccount, withdrawWallet, depositWallet, getTransactions } from '../services/wallet.js';
@@ -67,7 +68,14 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
     address: user?.lenderProfile?.address || '',
     phone: user?.lenderProfile?.phone || '',
     rentalPolicy: user?.lenderProfile?.rentalPolicy || '',
-    latePenaltyPolicy: user?.lenderProfile?.latePenaltyPolicy || ''
+    latePenaltyPolicy: user?.lenderProfile?.latePenaltyPolicy || '',
+    city: '',
+    district: '',
+    ward: '',
+    latitude: '',
+    longitude: '',
+    formattedAddress: '',
+    googlePlaceId: ''
   });
 
   // UI state
@@ -111,7 +119,7 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
 
   const loadData = async () => {
     try {
-      const [prodData, ordData, revData, revsData, notifData, walletData, configData, txData] = await Promise.all([
+      const [prodData, ordData, revData, revsData, notifData, walletData, configData, txData, userProfile] = await Promise.all([
         listLenderProducts(),
         getLenderOrders(),
         getLenderRevenue(),
@@ -119,7 +127,8 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
         getMyNotifications(),
         getBalance().catch(() => null),
         getPlatformConfig().catch(() => null),
-        getTransactions().catch(() => null)
+        getTransactions().catch(() => null),
+        getProfile().catch(() => null)
       ]);
       setProducts(Array.isArray(prodData?.items) ? prodData.items : Array.isArray(prodData) ? prodData : []);
       setOrders(Array.isArray(ordData) ? ordData : Array.isArray(ordData?.items) ? ordData.items : []);
@@ -141,6 +150,28 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
       }
       if (txData) {
         setTransactions(txData.data || []);
+      }
+      if (userProfile) {
+        localStorage.setItem('exe201-user', JSON.stringify(userProfile));
+        const lender = userProfile.profiles?.lender || {};
+        setProfileForm((prev) => ({
+          ...prev,
+          fullName: userProfile.fullName || '',
+          email: userProfile.email || '',
+          bio: lender.lenderDescription || lender.bio || '',
+          logoUrl: lender.logoUrl || '',
+          address: lender.pickupAddress?.addressLine1 || lender.address || '',
+          phone: lender.pickupAddress?.phone || lender.phone || '',
+          rentalPolicy: lender.rentalPolicy || '',
+          latePenaltyPolicy: lender.latePenaltyPolicy || '',
+          city: lender.pickupAddress?.city || '',
+          district: lender.pickupAddress?.district || '',
+          ward: lender.pickupAddress?.ward || '',
+          latitude: lender.location?.coordinates?.[1] || '',
+          longitude: lender.location?.coordinates?.[0] || '',
+          formattedAddress: lender.location?.formattedAddress || '',
+          googlePlaceId: lender.location?.googlePlaceId || ''
+        }));
       }
     } catch (err) {
       toast.error('Lỗi khi tải dữ liệu cửa hàng.');
@@ -423,24 +454,35 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
   const handleProfileSubmit = async (e) => {
     e.preventDefault();
     try {
-      const payload = {
-        fullName: profileForm.fullName,
-        lenderProfile: {
-          bio: profileForm.bio,
-          logoUrl: profileForm.logoUrl,
-          address: profileForm.address,
+      // 1. Update user full name
+      const updatedUser = await updateProfile({ fullName: profileForm.fullName });
+      
+      // 2. Update lender profile details on backend
+      const lenderPayload = {
+        lenderName: profileForm.fullName,
+        lenderDescription: profileForm.bio,
+        pickupAddress: {
           phone: profileForm.phone,
-          rentalPolicy: profileForm.rentalPolicy,
-          latePenaltyPolicy: profileForm.latePenaltyPolicy
-        }
+          addressLine1: profileForm.address,
+          addressLine2: '',
+          city: profileForm.city || '',
+          district: profileForm.district || '',
+          ward: profileForm.ward || ''
+        },
+        latitude: profileForm.latitude ? parseFloat(profileForm.latitude) : undefined,
+        longitude: profileForm.longitude ? parseFloat(profileForm.longitude) : undefined,
+        formattedAddress: profileForm.formattedAddress,
+        googlePlaceId: profileForm.googlePlaceId,
+        rentalPolicy: profileForm.rentalPolicy,
+        latePenaltyPolicy: profileForm.latePenaltyPolicy
       };
 
-      const updatedUser = await updateProfile(payload);
-      localStorage.setItem('exe201-user', JSON.stringify(updatedUser));
-      toast.success('Đã cập nhật thông tin cửa hàng thành công.');
+      await updateLenderProfile(lenderPayload);
+      
+      toast.success('Đã cập nhật cấu hình cửa hàng & vị trí bản đồ thành công.');
       loadData();
     } catch (err) {
-      toast.error('Lỗi cập nhật thông tin.');
+      toast.error(err?.response?.data?.message || 'Lỗi cập nhật thông tin.');
     }
   };
 
@@ -1343,6 +1385,26 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                   <label style={{ fontWeight: '800', display: 'block', marginBottom: '5px' }}>Địa chỉ cửa hàng *</label>
                   <input value={profileForm.address} onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })} required />
                 </div>
+              </div>
+
+              <div>
+                <label style={{ fontWeight: '800', display: 'block', marginBottom: '5px' }}>Định vị địa chỉ trên bản đồ *</label>
+                <GoogleMapsPicker 
+                  initialLat={profileForm.latitude} 
+                  initialLng={profileForm.longitude} 
+                  initialAddress={profileForm.formattedAddress}
+                  onLocationSelect={(loc) => setProfileForm(prev => ({
+                    ...prev,
+                    latitude: loc.latitude,
+                    longitude: loc.longitude,
+                    formattedAddress: loc.formattedAddress,
+                    googlePlaceId: loc.googlePlaceId,
+                    address: loc.formattedAddress || prev.address,
+                    city: loc.city || prev.city || '',
+                    district: loc.district || prev.district || '',
+                    ward: loc.ward || prev.ward || ''
+                  }))} 
+                />
               </div>
 
               <div>

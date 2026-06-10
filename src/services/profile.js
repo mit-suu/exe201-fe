@@ -10,4 +10,6 @@ export const updateProfile = async (payload) => {
   return user;
 };
 
+export const updateLenderProfile = async (payload) => (await api.patch('/users/lender-profile', payload)).data.data;
+
 export const changePassword = async (payload) => (await api.post('/auth/change-password', payload)).data;

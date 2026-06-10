@@ -4,7 +4,7 @@ import { getCurrentUser } from '../services/auth.js';
 import { createOrder } from '../services/orders.js';
 import { getProduct } from '../services/products.js';
 import { getProductReviews } from '../services/reviews.js';
-import { Palette, Sparkles, Package, Ruler, Calendar, MessageSquare, Store, Lock, Diamond, Banknote, ClipboardCheck, ShieldCheck, PackageCheck, MessageCircle, CheckCircle, XCircle } from 'lucide-react';
+import { Palette, Sparkles, Package, Ruler, Calendar, MessageSquare, Store, Lock, Diamond, Banknote, ClipboardCheck, ShieldCheck, PackageCheck, MessageCircle, CheckCircle, XCircle, MapPin } from 'lucide-react';
 
 const money = (value) => Number(value || 0).toLocaleString('vi-VN');
 
@@ -149,8 +149,8 @@ const ProductDetail = () => {
     ? product.images.map(img => typeof img === 'string' ? img : img?.url).filter(Boolean)
     : ['https://placehold.co/900x620?text=BuildLab'];
   const status = statusConfig[product.status] || statusConfig.available;
-  const shopData = product.shop || {};
-  const shopName = shopData.fullName || 'Shop';
+  const shopData = product.lender || {};
+  const shopName = shopData.lenderName || 'Shop';
 
   const availableSizes = Array.isArray(product.sizes)
     ? product.sizes
@@ -276,29 +276,63 @@ const ProductDetail = () => {
                 <div>
                   <h3 className="pd-shop-name">
                     {shopName}
-                    {shopData.lenderProfile?.isVerified && <span className="pd-verified-badge" style={{ display: 'inline-flex', alignItems: 'center', background: '#f3f4f6', padding: '2px 4px', borderRadius: '4px' }}><CheckCircle size={12} style={{ color: '#6b7280' }} /></span>}
+                    {shopData.isVerified && <span className="pd-verified-badge" style={{ display: 'inline-flex', alignItems: 'center', background: '#f3f4f6', padding: '2px 4px', borderRadius: '4px' }}><CheckCircle size={12} style={{ color: '#6b7280' }} /></span>}
                   </h3>
-                  {shopData.lenderProfile?.bio && (
-                    <p className="pd-shop-bio">{shopData.lenderProfile.bio}</p>
+                  {shopData.lenderDescription && (
+                    <p className="pd-shop-bio">{shopData.lenderDescription}</p>
                   )}
                 </div>
               </div>
               <div className="pd-shop-stats">
                 <div className="pd-shop-stat">
-                  <span className="pd-shop-stat-value">{shopData.lenderProfile?.reviewCount || 0}</span>
+                  <span className="pd-shop-stat-value">{shopData.rating?.count || 0}</span>
                   <span className="pd-shop-stat-label">Đánh giá</span>
                 </div>
                 <div className="pd-shop-stat">
                   <span className="pd-shop-stat-value" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {shopData.lenderProfile?.isVerified ? <CheckCircle size={16} style={{ color: '#6b7280' }} /> : <XCircle size={16} style={{ color: '#6b7280' }} />}
+                    {shopData.isVerified ? <CheckCircle size={16} style={{ color: '#6b7280' }} /> : <XCircle size={16} style={{ color: '#6b7280' }} />}
                   </span>
                   <span className="pd-shop-stat-label">Xác minh</span>
                 </div>
                 <div className="pd-shop-stat">
-                  <span className="pd-shop-stat-value">{shopData.lenderProfile?.autoApprove ? 'Tự động' : 'Thủ công'}</span>
+                  <span className="pd-shop-stat-value">{shopData.autoApprove ? 'Tự động' : 'Thủ công'}</span>
                   <span className="pd-shop-stat-label">Duyệt đơn</span>
                 </div>
               </div>
+
+              {/* OpenStreetMap Location */}
+              {shopData.googleMapsEmbedUrl && (
+                <div style={{ marginTop: '16px', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+                  <h4 style={{ margin: '0 0 10px', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}>
+                    <MapPin size={16} style={{ color: 'var(--accent)' }} /> 
+                    Vị trí cửa hàng
+                  </h4>
+                  {shopData.location?.formattedAddress && (
+                    <p style={{ fontSize: '0.85rem', color: 'var(--muted)', margin: '0 0 12px', lineHeight: '1.4' }}>
+                      {shopData.location.formattedAddress}
+                    </p>
+                  )}
+                  <iframe
+                    title="Bản đồ vị trí shop"
+                    src={shopData.googleMapsEmbedUrl}
+                    width="100%"
+                    height="200"
+                    style={{ border: 0, borderRadius: '10px', background: 'var(--surface-soft)' }}
+                    allowFullScreen=""
+                    loading="lazy"
+                  />
+                  <div style={{ marginTop: '8px', textAlign: 'right' }}>
+                    <a 
+                      href={shopData.googleMapsUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      style={{ fontSize: '0.8rem', color: 'var(--accent)', fontWeight: 'bold', textDecoration: 'underline' }}
+                    >
+                      Xem trên OpenStreetMap &rarr;
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

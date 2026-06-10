@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { FileText, CheckCircle } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../services/api.js';
 import { saveSession } from '../services/auth.js';
-import vnUnits from '../../vn_units.json';
+import GoogleMapsPicker from '../components/GoogleMapsPicker.jsx';
 
 const PartnerRegister = () => {
   const navigate = useNavigate();
@@ -21,8 +21,29 @@ const PartnerRegister = () => {
     addressLine2: '',
     city: '',
     district: '',
-    ward: ''
+    ward: '',
+    latitude: '',
+    longitude: '',
+    formattedAddress: '',
+    googlePlaceId: ''
   });
+
+  const handleLocationSelect = (loc) => {
+    setShopInfo((prev) => {
+      return {
+        ...prev,
+        latitude: loc.latitude,
+        longitude: loc.longitude,
+        formattedAddress: loc.formattedAddress,
+        googlePlaceId: loc.googlePlaceId,
+        addressLine1: loc.formattedAddress || '',
+        city: loc.city || '',
+        district: loc.district || '',
+        ward: loc.ward || ''
+      };
+    });
+  };
+
   const [regError, setRegError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showContractModal, setShowContractModal] = useState(false);
@@ -32,12 +53,6 @@ const PartnerRegister = () => {
   const [licenseUrl, setLicenseUrl] = useState('');
   const [isUploadingLicense, setIsUploadingLicense] = useState(false);
 
-  const selectedProvince = useMemo(
-    () => vnUnits.find((p) => p.FullName === shopInfo.city),
-    [shopInfo.city]
-  );
-  const wardsList = selectedProvince?.Wards || [];
-
   const handleLenderChange = (e) => {
     const { name, type, checked, value } = e.target;
     setLenderForm({ ...lenderForm, [name]: type === 'checkbox' ? checked : value });
@@ -45,15 +60,6 @@ const PartnerRegister = () => {
 
   const handleShopChange = (e) => {
     const { name, value } = e.target;
-    if (name === 'city') {
-      setShopInfo({
-        ...shopInfo,
-        city: value,
-        district: '',
-        ward: ''
-      });
-      return;
-    }
     setShopInfo({ ...shopInfo, [name]: value });
   };
 
@@ -91,6 +97,10 @@ const PartnerRegister = () => {
     }
     if (!licenseUrl) {
       setRegError('Bạn cần tải lên ảnh Giấy phép kinh doanh / CCCD.');
+      return;
+    }
+    if (!shopInfo.latitude || !shopInfo.longitude) {
+      setRegError('Vui lòng chọn vị trí cửa hàng trên Google Maps.');
       return;
     }
 
@@ -262,84 +272,39 @@ const PartnerRegister = () => {
               />
             </div>
 
-            <div className="form-row">
-              <div className="input-group">
-                <label>Số điện thoại</label>
-                <input
-                  type="text"
-                  name="phone"
-                  placeholder="090..."
-                  value={shopInfo.phone}
-                  onChange={handleShopChange}
-                  required
-                />
-              </div>
-              <div className="input-group">
-                <label>Tỉnh/Thành phố</label>
-                <select name="city" value={shopInfo.city} onChange={handleShopChange} required>
-                  <option value="">Chọn Tỉnh/TP</option>
-                  {vnUnits.map((p) => (
-                    <option key={p.Code} value={p.FullName}>
-                      {p.FullName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="input-group">
-                <label>Quận/Huyện/Khu vực</label>
-                <input
-                  type="text"
-                  name="district"
-                  placeholder="Ví dụ: Hải Châu, Sơn Trà..."
-                  value={shopInfo.district}
-                  onChange={handleShopChange}
-                  required
-                />
-              </div>
-              <div className="input-group">
-                <label>Phường/Xã</label>
-                <select
-                  name="ward"
-                  value={shopInfo.ward}
-                  onChange={handleShopChange}
-                  required
-                  disabled={!shopInfo.city}
-                >
-                  <option value="">Chọn Phường/Xã</option>
-                  {wardsList.map((w) => (
-                    <option key={w.Code} value={w.FullName}>
-                      {w.FullName}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div className="input-group" style={{ marginBottom: '16px' }}>
+              <label style={{ fontWeight: '800', display: 'block', marginBottom: '5px' }}>Định vị địa chỉ trên bản đồ *</label>
+              <GoogleMapsPicker 
+                initialLat={shopInfo.latitude} 
+                initialLng={shopInfo.longitude} 
+                initialAddress={shopInfo.formattedAddress}
+                onLocationSelect={handleLocationSelect} 
+              />
             </div>
 
             <div className="input-group">
-              <label>Địa chỉ cụ thể</label>
+              <label>Số điện thoại</label>
               <input
                 type="text"
-                name="addressLine1"
-                placeholder="Số nhà, tên đường..."
-                value={shopInfo.addressLine1}
+                name="phone"
+                placeholder="090..."
+                value={shopInfo.phone}
                 onChange={handleShopChange}
                 required
               />
             </div>
 
-            <div className="input-group">
-              <label>Địa chỉ bổ sung</label>
-              <input
-                type="text"
-                name="addressLine2"
-                placeholder="(Không bắt buộc) Tòa nhà, khu vực..."
-                value={shopInfo.addressLine2}
-                onChange={handleShopChange}
-              />
-            </div>
+            {shopInfo.formattedAddress && (
+              <div className="input-group">
+                <label>Địa chỉ nhận diện từ bản đồ</label>
+                <input
+                  type="text"
+                  value={shopInfo.formattedAddress}
+                  disabled
+                  style={{ background: 'var(--surface-soft)', color: 'var(--text)', opacity: 0.8 }}
+                />
+              </div>
+            )}
           </div>
 
           <button type="submit" className="primary-button partner-submit-btn" disabled={isSubmitting}>
