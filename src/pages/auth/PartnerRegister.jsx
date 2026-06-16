@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { FileText, CheckCircle } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 import api from '../../services/api.js';
 import { saveSession } from '../../services/auth.js';
 import GoogleMapsPicker from '../../components/GoogleMapsPicker.jsx';
@@ -80,7 +81,7 @@ const PartnerRegister = () => {
       });
       setLicenseUrl(response.data.data.url);
     } catch (err) {
-      setRegError('Tải ảnh thất bại. Vui lòng thử lại.');
+      toast.error('Tải ảnh thất bại. Vui lòng thử lại.');
       setLicenseFile(null);
     } finally {
       setIsUploadingLicense(false);
@@ -92,15 +93,15 @@ const PartnerRegister = () => {
     setRegError(null);
 
     if (!isContractSigned || !signature) {
-      setRegError('Bạn cần ký hợp đồng điện tử trước khi đăng ký.');
+      toast.error('Bạn cần ký hợp đồng điện tử trước khi đăng ký.');
       return;
     }
     if (!licenseUrl) {
-      setRegError('Bạn cần tải lên ảnh Giấy phép kinh doanh / CCCD.');
+      toast.error('Bạn cần tải lên ảnh Giấy phép kinh doanh / CCCD.');
       return;
     }
     if (!shopInfo.latitude || !shopInfo.longitude) {
-      setRegError('Vui lòng chọn vị trí cửa hàng trên Google Maps.');
+      toast.error('Vui lòng chọn vị trí cửa hàng trên Google Maps.');
       return;
     }
 
@@ -120,7 +121,7 @@ const PartnerRegister = () => {
       navigate('/shop/dashboard');
       window.location.reload();
     } catch (err) {
-      setRegError(err?.response?.data?.message || 'Đăng ký đối tác thất bại');
+      toast.error(err?.response?.data?.message || 'Đăng ký đối tác thất bại');
     } finally {
       setIsSubmitting(false);
     }
@@ -147,7 +148,7 @@ const PartnerRegister = () => {
           <p>Điền thông tin để tạo tài khoản chủ shop.</p>
         </div>
         
-        {regError && <div className="alert">{regError}</div>}
+
 
         <form onSubmit={handleLenderSubmit} className="partner-modal-form">
           <div className="form-section">

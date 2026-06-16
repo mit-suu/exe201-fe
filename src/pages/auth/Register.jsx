@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 import api from '../../services/api.js';
 import { saveSession } from '../../services/auth.js';
 
@@ -26,7 +27,7 @@ const Register = () => {
       navigate(registeredUser?.role === 'admin' ? '/admin' : isShop ? '/shop/dashboard' : '/');
       window.location.reload();
     } catch (err) {
-      setError(err?.response?.data?.message || 'Đăng ký thất bại');
+      toast.error(err?.response?.data?.message || 'Đăng ký thất bại');
     }
   };
 
@@ -50,7 +51,7 @@ const Register = () => {
           <h2>Bắt đầu với BuildLab</h2>
           <p>Điền thông tin cơ bản để tạo tài khoản người dùng.</p>
         </div>
-        {error && <div className="alert">{error}</div>}
+
         <form onSubmit={handleSubmit} className="input-group auth-form">
           <label>Họ và tên</label>
           <input type="text" name="fullName" placeholder="Nguyễn Văn A" value={form.fullName} onChange={handleChange} required />

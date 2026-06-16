@@ -12,6 +12,13 @@ const CostumesTab = (props) => {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [filterCategory, setFilterCategory] = React.useState('all');
   const [sortBy, setSortBy] = React.useState('name_asc');
+  const [categoriesList, setCategoriesList] = React.useState([]);
+
+  React.useEffect(() => {
+    import('../../services/products.js').then(m => m.listCategories())
+      .then(data => { if (Array.isArray(data)) setCategoriesList(data); })
+      .catch(console.error);
+  }, []);
 
   const {
     user, shopStatus, products, orders, reviews, notifications, revenueStats, transactions, wallet,
@@ -87,11 +94,10 @@ const CostumesTab = (props) => {
                     onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
                     style={{ background: 'white', width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid var(--border)' }}
                   >
-                    <option value="traditional">Traditional (Áo dài/Cổ phục)</option>
-                    <option value="wedding">Wedding (Váy cưới/Vest)</option>
-                    <option value="party">Party (Dạ tiệc)</option>
-                    <option value="cosplay">Cosplay (Anime/Game)</option>
-                    <option value="festival">Festival (Lễ hội)</option>
+                    <option value="" disabled>Chọn danh mục</option>
+                    {categoriesList.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -212,11 +218,10 @@ const CostumesTab = (props) => {
                 style={{ padding: '10px', borderRadius: '10px', border: '1px solid var(--border)', background: 'white' }}
               >
                 <option value="all">Tất cả danh mục</option>
-                <option value="traditional">Traditional (Áo dài/Cổ phục)</option>
-                <option value="wedding">Wedding (Váy cưới/Vest)</option>
-                <option value="party">Party (Dạ tiệc)</option>
-                <option value="cosplay">Cosplay (Anime/Game)</option>
-                <option value="festival">Festival (Lễ hội)</option>
+                <option value="all">Tất cả danh mục</option>
+                {categoriesList.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
               </select>
               <select 
                 value={sortBy} 

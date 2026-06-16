@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import ProductCard from '../../components/ProductCard.jsx';
 import { listProducts, listCategories, listSizes } from '../../services/products.js';
 import { trackEvent } from '../../hooks/useAnalytics.js';
@@ -26,7 +27,9 @@ const features = [
 ];
 
 const Home = () => {
+  const { t } = useTranslation();
   const [products, setProducts] = useState([]);
+  const [visibleCount, setVisibleCount] = useState(10);
   const [filters, setFilters] = useState({ q: '', category: '', size: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -37,7 +40,10 @@ const Home = () => {
     setLoading(true);
     setError('');
     listProducts(filters)
-      .then((data) => setProducts(Array.isArray(data) ? data : []))
+      .then((data) => {
+        setProducts(Array.isArray(data) ? data : []);
+        setVisibleCount(10);
+      })
       .catch((err) => {
         setProducts([]);
         setError(err?.response?.data?.message || 'Không tải được sản phẩm. Kiểm tra backend và MongoDB rồi thử lại.');
@@ -70,16 +76,29 @@ const Home = () => {
     return () => clearTimeout(delay);
   }, [filters.q, filters.category]);
 
+  useEffect(() => {
+    const handleScroll = () => {
+      if (
+        window.innerHeight + document.documentElement.scrollTop
+        >= document.documentElement.offsetHeight - 500
+      ) {
+        setVisibleCount((prev) => prev + 10);
+      }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   return (
     <div className="home-page">
       <section className="hero-section">
         <div className="hero-copy">
-          <p className="eyebrow">BuildLab Costume Rental</p>
-          <h1>Thuê trang phục đẹp cho mọi khoảnh khắc quan trọng</h1>
-          <p className="hero-text">Khám phá catalog áo dài, váy cưới, suit, đầm dạ hội và cosplay. Đặt lịch thuê nhanh, quản lý đơn rõ ràng, chat với admin và nhận tư vấn AI trong một nền tảng.</p>
+          <p className="eyebrow">{t('home.hero.eyebrow')}</p>
+          <h1>{t('home.hero.title')}</h1>
+          <p className="hero-text">{t('home.hero.text')}</p>
           <div className="hero-actions">
-            <a className="primary-button" href="#catalog">Xem trang phục</a>
-            <Link className="secondary-button" to="/register">Tạo tài khoản</Link>
+            <a className="primary-button" href="#catalog">{t('home.hero.viewCatalog')}</a>
+            <Link className="secondary-button" to="/register">{t('home.hero.createAccount')}</Link>
           </div>
           <div className="hero-stats">
             <div><strong>8+</strong><span>Mẫu khởi tạo</span></div>
@@ -142,7 +161,7 @@ const Home = () => {
         {error && <div className="alert">{error}</div>}
         {loading && <div className="empty-state">Đang tải catalog trang phục...</div>}
         {!loading && !error && products.length === 0 && <div className="empty-state">Chưa có sản phẩm hiển thị.</div>}
-        {!loading && products.length > 0 && <div className="product-grid">{products.map((product) => <ProductCard key={product._id} product={product} />)}</div>}
+        {!loading && products.length > 0 && <div className="product-grid">{products.slice(0, visibleCount).map((product) => <ProductCard key={product._id} product={product} />)}</div>}
       </section>
 
       {featuredProducts.length > 0 && (
