@@ -165,6 +165,7 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
       if (userProfile) {
         localStorage.setItem('exe201-user', JSON.stringify(userProfile));
         const lender = userProfile.profiles?.lender || {};
+        if (lender.status) setShopStatus(lender.status);
         setProfileForm((prev) => ({
           ...prev,
           fullName: userProfile.fullName || '',

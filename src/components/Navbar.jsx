@@ -2,11 +2,18 @@ import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { clearSession, getCurrentUser } from '../services/auth.js';
 import { Home, Shirt, ShoppingBag, Wallet, User, Store, LogIn, UserPlus, Settings, LogOut, LayoutDashboard, MessageCircle, BarChart3, KeyRound } from 'lucide-react';
 import { useCart } from '../hooks/useCart.js';
+import { useTranslation } from 'react-i18next';
+import { Globe } from 'lucide-react';
 
 const Navbar = ({ user }) => {
   const { cart } = useCart();
   const navigate = useNavigate();
   const currentUser = user ?? getCurrentUser();
+  const { t, i18n } = useTranslation();
+
+  const toggleLanguage = () => {
+    i18n.changeLanguage(i18n.language.startsWith('vi') ? 'en' : 'vi');
+  };
 
   const handleLogout = () => {
     clearSession();
@@ -52,17 +59,17 @@ const Navbar = ({ user }) => {
           {/* Customer / Guest Menu */}
           {!isAdmin && !isShop && (
             <>
-              <NavLink to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Home size={18} /> Home</NavLink>
-              <NavLink to="/products" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Shirt size={18} /> Costumes</NavLink>
+              <NavLink to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Home size={18} /> {t('navbar.home')}</NavLink>
+              <NavLink to="/products" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Shirt size={18} /> {t('navbar.costumes')}</NavLink>
               <NavLink to="/cart" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', position: 'relative' }}>
                 <ShoppingBag size={18} /> 
-                Giỏ hàng
+                {t('navbar.cart')}
                 {cart.length > 0 && <span style={{ position: 'absolute', top: '-8px', right: '-12px', background: 'var(--accent)', color: 'white', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: 'bold' }}>{cart.length}</span>}
               </NavLink>
               {isCustomer && (
                 <>
-                  <NavLink to="/orders/history" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><ShoppingBag size={18} /> Orders</NavLink>
-                  <NavLink to="/my-wallet" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Wallet size={18} /> My Wallet</NavLink>
+                  <NavLink to="/orders/history" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><ShoppingBag size={18} /> {t('navbar.orders')}</NavLink>
+                  <NavLink to="/my-wallet" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Wallet size={18} /> {t('navbar.wallet')}</NavLink>
                 </>
               )}
             </>
@@ -74,7 +81,7 @@ const Navbar = ({ user }) => {
         <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           {!isAdmin && !isShop && (
             <Link className="nav-button nav-highlight" to="/partner-register" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-              <Store size={18} /> Mở gian hàng
+              <Store size={18} /> {t('navbar.openShop')}
             </Link>
           )}
 
@@ -94,6 +101,9 @@ const Navbar = ({ user }) => {
                 {isCustomer && <Link to="/orders/history" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}><ShoppingBag size={16} /> Lịch sử đơn đặt</Link>}
                 {isCustomer && <Link to="/my-wallet" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}><Wallet size={16} /> Ví của tôi</Link>}
                 <Link to="/support-chat" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}><MessageCircle size={16} /> Hỗ trợ</Link>
+                <button type="button" onClick={toggleLanguage} style={{ color: 'var(--accent)', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <Globe size={16} /> {i18n.language.startsWith('vi') ? 'Tiếng Anh (EN)' : 'Vietnamese (VI)'}
+                </button>
                 <button type="button" onClick={handleLogout} style={{ color: 'var(--danger)', display: 'inline-flex', alignItems: 'center', gap: '8px' }}><LogOut size={16} /> Đăng xuất</button>
               </div>
             </div>

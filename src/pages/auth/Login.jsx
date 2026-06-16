@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 import api from '../../services/api.js';
 import { saveSession } from '../../services/auth.js';
 
@@ -27,7 +28,7 @@ const Login = () => {
       navigate(isAdmin ? '/admin' : isShop ? '/shop/dashboard' : '/');
       window.location.reload();
     } catch (err) {
-      setError(err?.response?.data?.message || 'Đăng nhập thất bại');
+      toast.error(err?.response?.data?.message || 'Đăng nhập thất bại');
     }
   };
 
@@ -51,7 +52,7 @@ const Login = () => {
           <h2>Vào tài khoản</h2>
           <p>Sử dụng email và mật khẩu đã đăng ký trên BuildLab.</p>
         </div>
-        {error && <div className="alert">{error}</div>}
+
         <form onSubmit={handleSubmit} className="input-group auth-form">
           <label>Email</label>
           <input type="email" name="email" placeholder="admin@buildlab.vn" value={form.email} onChange={handleChange} required />

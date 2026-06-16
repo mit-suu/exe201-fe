@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
+import { toast } from 'react-hot-toast';
 import { getProfile, updateProfile } from '../../services/profile.js';
 
 const Profile = () => {
   const [form, setForm] = useState({ fullName: '', email: '', phone: '', street: '', district: '', city: '' });
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -20,14 +19,12 @@ const Profile = () => {
           city: defaultAddr.city || ''
         });
       })
-      .catch((err) => setError(err?.response?.data?.message || 'Không tải được thông tin tài khoản.'))
+      .catch((err) => toast.error(err?.response?.data?.message || 'Không tải được thông tin tài khoản.'))
       .finally(() => setLoading(false));
   }, []);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setMessage('');
-    setError('');
     try {
       const user = await updateProfile({
         fullName: form.fullName,
@@ -51,9 +48,9 @@ const Profile = () => {
         district: defaultAddr.district || '',
         city: defaultAddr.city || ''
       });
-      setMessage('Đã cập nhật thông tin tài khoản thành công.');
+      toast.success('Đã cập nhật thông tin tài khoản thành công.');
     } catch (err) {
-      setError(err?.response?.data?.message || 'Không cập nhật được thông tin.');
+      toast.error(err?.response?.data?.message || 'Không cập nhật được thông tin.');
     }
   };
 
@@ -68,8 +65,7 @@ const Profile = () => {
         </div>
       </div>
       {loading && <div className="empty-state">Đang tải thông tin...</div>}
-      {message && <div className="alert success-alert">{message}</div>}
-      {error && <div className="alert">{error}</div>}
+
       {!loading && (
         <form className="input-group profile-form" onSubmit={handleSubmit} style={{ display: 'grid', gap: '15px' }}>
           <label>Họ và tên</label>
