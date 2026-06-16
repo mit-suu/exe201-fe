@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const money = (value) => Number(value || 0).toLocaleString('vi-VN');
 
@@ -22,6 +22,7 @@ const conditionLabels = {
 };
 
 const ProductCard = ({ product }) => {
+  const navigate = useNavigate();
   const [imageSrc, setImageSrc] = useState(
     (product.images?.[0]?.url || product.images?.[0]) || 'https://placehold.co/800x620/f1f5f9/111827?text=BuildLab'
   );
@@ -35,7 +36,7 @@ const ProductCard = ({ product }) => {
   const stockQuantity = product.inventory?.quantityTotal ?? product.stockQuantity ?? 1;
 
   return (
-    <article className="product-card">
+    <article className="product-card" style={{ cursor: 'pointer' }} onClick={(e) => { if (!e.target.closest('a') && !e.target.closest('button')) navigate('/products/' + product._id); }}>
       <Link className="product-image-link" to={`/products/${product._id}`}>
         <img src={imageSrc} alt={product.name} onError={() => setImageSrc('https://placehold.co/800x620/f1f5f9/111827?text=BuildLab')} />
         <span className="product-badge">{product.category?.name || categoryLabels[product.category?.slug || product.category] || product.category?.slug || product.category}</span>
@@ -43,7 +44,7 @@ const ProductCard = ({ product }) => {
       <div className="product-body">
         <div className="product-title-row">
           <div>
-            <h3>{product.name}</h3>
+            <h3><Link to={`/products/${product._id}`} style={{ color: 'inherit', textDecoration: 'none' }}>{product.name}</Link></h3>
             <p>{conditionLabels[product.condition] || product.condition} • Còn {stockQuantity} bộ</p>
           </div>
         </div>

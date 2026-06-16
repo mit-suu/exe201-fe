@@ -1,8 +1,10 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { clearSession, getCurrentUser } from '../services/auth.js';
 import { Home, Shirt, ShoppingBag, Wallet, User, Store, LogIn, UserPlus, Settings, LogOut, LayoutDashboard, MessageCircle, BarChart3, KeyRound } from 'lucide-react';
+import { useCart } from '../hooks/useCart.js';
 
 const Navbar = ({ user }) => {
+  const { cart } = useCart();
   const navigate = useNavigate();
   const currentUser = user ?? getCurrentUser();
 
@@ -52,11 +54,15 @@ const Navbar = ({ user }) => {
             <>
               <NavLink to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Home size={18} /> Home</NavLink>
               <NavLink to="/products" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Shirt size={18} /> Costumes</NavLink>
+              <NavLink to="/cart" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', position: 'relative' }}>
+                <ShoppingBag size={18} /> 
+                Giỏ hàng
+                {cart.length > 0 && <span style={{ position: 'absolute', top: '-8px', right: '-12px', background: 'var(--accent)', color: 'white', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: 'bold' }}>{cart.length}</span>}
+              </NavLink>
               {isCustomer && (
                 <>
                   <NavLink to="/orders/history" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><ShoppingBag size={18} /> Orders</NavLink>
                   <NavLink to="/my-wallet" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Wallet size={18} /> My Wallet</NavLink>
-                  <NavLink to="/profile" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><User size={18} /> Profile</NavLink>
                 </>
               )}
                <Link className="nav-button nav-highlight" to="/partner-register" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>

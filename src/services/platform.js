@@ -18,6 +18,9 @@ export const updateComplaintStatus = async (id, payload) => {
 export const getActivityLogs = async () => {
   try { return (await api.get('/platform/logs')).data.data; } catch(e) { return []; }
 };
+export const getActivityStats = async (period = 'today') => {
+  try { return (await api.get('/platform/logs/stats', { params: { period } })).data.data; } catch(e) { return null; }
+};
 export const getAdminBankInfo = async () => {
   try { return (await api.get('/settings/bank')).data.data; } catch(e) { return null; }
 };
