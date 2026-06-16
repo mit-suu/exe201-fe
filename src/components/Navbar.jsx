@@ -65,10 +65,17 @@ const Navbar = ({ user }) => {
                   <NavLink to="/my-wallet" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Wallet size={18} /> My Wallet</NavLink>
                 </>
               )}
-               <Link className="nav-button nav-highlight" to="/partner-register" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                 <Store size={18} /> Mở gian hàng
-               </Link>
             </>
+          )}
+
+          {/* Auth Button/Dropdown has been moved */}
+        </nav>
+
+        <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {!isAdmin && !isShop && (
+            <Link className="nav-button nav-highlight" to="/partner-register" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <Store size={18} /> Mở gian hàng
+            </Link>
           )}
 
           {/* Auth Button/Dropdown */}
@@ -78,7 +85,7 @@ const Navbar = ({ user }) => {
               <div className="profile-dropdown">
                 <div style={{ padding: '8px 12px', fontSize: '0.9rem', borderBottom: '1px solid var(--border)' }}>
                   <strong>{currentUser.fullName}</strong>
-                  <div style={{ color: 'var(--muted)', fontSize: '0.8rem', marginTop: '2px' }}>{currentUser.email}</div>
+                  <div style={{ color: 'var(--muted)', fontSize: '0.8rem', margin: '2px 0 0' }}>{currentUser.email}</div>
                 </div>
                 {isAdmin && <Link to="/admin" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}><LayoutDashboard size={16} /> Vào trang quản trị</Link>}
                 {isShop && <Link to="/shop/dashboard" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}><Store size={16} /> Vào dashboard cửa hàng</Link>}
@@ -96,7 +103,7 @@ const Navbar = ({ user }) => {
               <Link className="nav-cta" to="/register" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><UserPlus size={18} /> Đăng ký</Link>
             </>
           )}
-        </nav>
+        </div>
       </div>
     </header>
   );
