@@ -11,7 +11,7 @@ import { getAdminFeedbacks, updateFeedback } from '../../services/feedbacks.js';
 import ContractModal from '../../components/ContractModal.jsx';
 import ChatBox from '../../components/ChatBox.jsx';
 import { getConversations } from '../../services/chats.js';
-import { BarChart3, Users, Store, Shirt, ShoppingBag, Tags, Settings, ShieldAlert, Wallet, MessageSquare, LogOut, AlertTriangle, Clock, Info, ExternalLink, MessageSquarePlus } from 'lucide-react';
+import { BarChart3, Users, Store, Shirt, ShoppingBag, Tags, Settings, ShieldAlert, Wallet, MessageSquare, LogOut, AlertTriangle, Clock, Info, ExternalLink, MessageSquarePlus, Ticket, Send } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { connectSocket, disconnectSocket } from '../../services/socket.js';
 
@@ -22,6 +22,8 @@ import CostumesTab from './CostumesTab.jsx';
 import OrdersTab from './OrdersTab.jsx';
 import CategoriesTab from './CategoriesTab.jsx';
 import ConfigTab from './ConfigTab.jsx';
+import CouponTab from './CouponTab.jsx';
+import EmailMarketingTab from './EmailMarketingTab.jsx';
 import ComplaintsLogsTab from './ComplaintsLogsTab.jsx';
 import WithdrawalsTab from './WithdrawalsTab.jsx';
 import ChatTab from './ChatTab.jsx';
@@ -333,6 +335,8 @@ const AdminDashboard = () => {
     { id: 'orders', label: 'Đơn đặt thuê', icon: <ShoppingBag size={20} /> },
     { id: 'categories', label: 'Danh mục', icon: <Tags size={20} /> },
     { id: 'config', label: 'Cấu hình hệ thống', icon: <Settings size={20} /> },
+    { id: 'coupons', label: 'Mã giảm giá', icon: <Ticket size={20} /> },
+    { id: 'email_marketing', label: 'Email Marketing', icon: <Send size={20} /> },
     { id: 'complaints_logs', label: 'Tranh chấp & Logs', icon: <ShieldAlert size={20} /> },
     { id: 'withdrawals', label: 'Duyệt rút tiền', icon: <Wallet size={20} /> },
     { id: 'feedbacks', label: 'Góp ý / Báo lỗi', icon: <MessageSquarePlus size={20} /> },
@@ -394,6 +398,8 @@ const AdminDashboard = () => {
         {activeTab === 'complaints_logs' && <ComplaintsLogsTab disputes={disputes} logs={logs} logStats={logStats} setResolvingDispute={setResolvingDispute} setResolutionForm={setResolutionForm} fetchLogStats={fetchLogStats} />}
         {activeTab === 'withdrawals' && <WithdrawalsTab withdrawals={withdrawals} handleProcessWithdrawal={handleProcessWithdrawal} visibleWithdrawalQr={visibleWithdrawalQr} setVisibleWithdrawalQr={setVisibleWithdrawalQr} />}
         {activeTab === 'feedbacks' && <FeedbacksTab feedbacks={feedbacks} handleUpdateFeedback={handleUpdateFeedback} />}
+        {activeTab === 'coupons' && <CouponTab />}
+        {activeTab === 'email_marketing' && <EmailMarketingTab />}
         {activeTab === 'chat' && <ChatTab conversations={conversations} selectedConvId={selectedConvId} setSelectedConvId={setSelectedConvId} />}
       </main>
 

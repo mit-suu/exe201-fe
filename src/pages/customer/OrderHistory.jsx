@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import StatusBadge from '../../components/StatusBadge.jsx';
-import { getMyOrders, cancelOrder } from '../../services/orders.js';
+import { getMyOrders, cancelOrder, extendOrder } from '../../services/orders.js';
 import { getCurrentUser } from '../../services/auth.js';
 import ContractModal from '../../components/ContractModal.jsx';
 import { createReview } from '../../services/reviews.js';
@@ -17,6 +17,9 @@ const OrderHistory = () => {
   const [successMsg, setSuccessMsg] = useState('');
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showContractModal, setShowContractModal] = useState(false);
+  const [showExtendModal, setShowExtendModal] = useState(false);
+  const [extendDate, setExtendDate] = useState('');
+  const [extending, setExtending] = useState(false);
   const [reviewingOrder, setReviewingOrder] = useState(null);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
@@ -178,21 +181,9 @@ const OrderHistory = () => {
                       Báo cáo / Khiếu nại
                     </button>
                   )}
-                  {order.status === 'rented' && (
-                    <button 
-                      onClick={async () => {
-                        const newEndDate = window.prompt('Nhập ngày bạn muốn gia hạn đến (YYYY-MM-DD):');
-                        if (newEndDate) {
-                          try {
-                            const { extendOrder } = await import('../../services/orders.js');
-                            await extendOrder(order._id, newEndDate);
-                            toast.success('Đã gửi yêu cầu gia hạn thành công.');
-                            loadOrders();
-                          } catch (err) {
-                            toast.error('Lỗi: ' + (err?.response?.data?.message || err.message));
-                          }
-                        }
-                      }} 
+                  {order.status === 'Rented' && (
+                    <button
+                      onClick={() => { setSelectedOrder(order); setExtendDate(order.endDate?.slice(0,10) || ''); setShowExtendModal(true); }}
                       className="button"
                       style={{ minHeight: '38px', fontSize: '0.85rem' }}
                     >
@@ -605,6 +596,36 @@ const OrderHistory = () => {
               <button className="primary-button danger" type="submit">Gửi khiếu nại</button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Extend Modal */}
+      {showExtendModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div className="card" style={{ width: 'min(450px, 100%)', background: 'white', borderRadius: '24px', padding: '30px', position: 'relative' }}>
+            <button onClick={() => setShowExtendModal(false)} style={{ position: 'absolute', top: '20px', right: '20px', width: '36px', height: '36px', borderRadius: '50%', background: 'var(--surface-soft)', border: '0', fontSize: '1.2rem', display: 'grid', placeItems: 'center' }}>×</button>
+            <h2 style={{ margin: '0 0 10px' }}>Gia hạn thuê</h2>
+            <p style={{ color: 'var(--muted)', fontSize: '0.9rem', marginBottom: '20px' }}>Đơn #{(selectedOrder?._id || '').slice(-8).toUpperCase()} — Chọn ngày trả mới.</p>
+            <div className="input-group">
+              <label>Ngày trả mới (hiện tại: {selectedOrder?.endDate?.slice(0,10)})</label>
+              <input type="date" value={extendDate} min={selectedOrder?.endDate?.slice(0,10)} onChange={(e) => setExtendDate(e.target.value)} />
+            </div>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowExtendModal(false)} className="secondary-button">Hủy</button>
+              <button onClick={async () => {
+                if (!extendDate) return toast.error('Chọn ngày trả mới');
+                try {
+                  setExtending(true);
+                  await extendOrder(selectedOrder._id, extendDate);
+                  toast.success('Gia hạn thành công!');
+                  setShowExtendModal(false);
+                  loadOrders();
+                } catch (e) {
+                  toast.error(e?.response?.data?.message || 'Lỗi gia hạn');
+                } finally { setExtending(false); }
+              }} className="primary-button" disabled={extending}>{extending ? 'Đang xử lý...' : 'Xác nhận gia hạn'}</button>
+            </div>
+          </div>
         </div>
       )}
     </section>

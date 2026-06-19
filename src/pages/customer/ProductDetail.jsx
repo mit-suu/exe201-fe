@@ -65,6 +65,7 @@ const ProductDetail = () => {
   const [reviews, setReviews] = useState([]);
   const [activeImage, setActiveImage] = useState(0);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [showLightbox, setShowLightbox] = useState(false);
   const [form, setForm] = useState({ 
     size: '', 
     startDate: '', 
@@ -77,6 +78,10 @@ const ProductDetail = () => {
   const [message, setMessage] = useState({ text: '', type: '' });
   const [submitting, setSubmitting] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [couponCode, setCouponCode] = useState('');
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [couponMsg, setCouponMsg] = useState('');
+  const [checkingCoupon, setCheckingCoupon] = useState(false);
 
   useEffect(() => {
     getProduct(id).then((item) => {
@@ -210,6 +215,8 @@ const ProductDetail = () => {
                   src={images[activeImage]}
                   alt={product.name}
                   onLoad={() => setImageLoaded(true)}
+                  onClick={() => setShowLightbox(true)}
+                  style={{ cursor: 'pointer' }}
                 />
               </div>
               <div className="pd-image-status" style={{ background: status.bg, color: status.color }}>
@@ -674,6 +681,23 @@ const ProductDetail = () => {
                 <p style={{ margin: 0 }}><strong>Địa chỉ:</strong> {form.shippingAddress}</p>
               </div>
 
+              <h4 style={{ marginBottom: '10px', fontSize: '0.9rem', color: 'var(--muted)' }}>Mã giảm giá</h4>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+                <input type="text" value={couponCode} onChange={e => { setCouponCode(e.target.value.toUpperCase()); setCouponDiscount(0); setCouponMsg(''); }} placeholder="Nhập mã giảm giá" style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '0.9rem' }} />
+                <button disabled={checkingCoupon || !couponCode} onClick={async () => {
+                  try {
+                    setCheckingCoupon(true);
+                    const res = await (await import('../../services/api.js')).default.post('/coupons/validate', { code: couponCode, orderTotal: costBreakdown?.total || 0 });
+                    setCouponDiscount(res.data.data.discount);
+                    setCouponMsg(`Giảm ${money(res.data.data.discount)} đ`);
+                  } catch (err) {
+                    setCouponDiscount(0);
+                    setCouponMsg(err?.response?.data?.message || 'Mã không hợp lệ');
+                  } finally { setCheckingCoupon(false); }
+                }} className="button" style={{ minWidth: '80px' }}>{checkingCoupon ? '...' : 'Áp dụng'}</button>
+              </div>
+              {couponMsg && <p style={{ fontSize: '0.85rem', marginTop: '-12px', marginBottom: '16px', color: couponDiscount > 0 ? 'var(--success)' : 'var(--danger)' }}>{couponMsg}</p>}
+
               <h4 style={{ marginBottom: '10px', fontSize: '0.9rem', color: 'var(--muted)' }}>Chi tiết Thanh toán</h4>
               <div style={{ background: 'var(--surface-soft)', padding: '15px', borderRadius: '12px', marginBottom: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.9rem' }}>
@@ -690,8 +714,12 @@ const ProductDetail = () => {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '12px', borderTop: '1px dashed var(--border)', marginTop: '12px' }}>
                   <strong>Tổng cộng</strong>
-                  <strong style={{ color: 'var(--accent)', fontSize: '1.2rem' }}>{money(costBreakdown?.total)} đ</strong>
+                  <strong style={{ color: 'var(--accent)', fontSize: '1.2rem' }}>{money((costBreakdown?.total || 0) - couponDiscount)} đ</strong>
                 </div>
+                {couponDiscount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--success)', marginTop: '4px' }}>
+                  <span>Giảm giá (mã)</span>
+                  <strong>-{money(couponDiscount)} đ</strong>
+                </div>}
               </div>
 
               <div style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>
@@ -716,6 +744,64 @@ const ProductDetail = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Lightbox fullscreen với zoom */}
+      {showLightbox && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.92)', zIndex: 9999,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          padding: '20px', userSelect: 'none'
+        }}>
+          <button onClick={() => { setShowLightbox(false); setZoomLevel(1); }}
+            style={{ position: 'absolute', top: '16px', right: '20px', background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', fontSize: '1.8rem', cursor: 'pointer', zIndex: 10000, width: '44px', height: '44px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >&times;</button>
+
+
+          <div style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', zIndex: 10000 }}>{activeImage + 1} / {images.length}</div>
+
+          {images.length > 1 && (
+            <button onClick={(e) => { e.stopPropagation(); setActiveImage(a => (a === 0 ? images.length - 1 : a - 1)); setZoomLevel(1); }}
+              style={{ position: 'absolute', left: '20px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.12)', border: 'none', color: 'white', fontSize: '2rem', cursor: 'pointer', zIndex: 10000, width: '50px', height: '50px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >&lsaquo;</button>
+          )}
+
+          <div
+            onMouseMove={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              const x = ((e.clientX - rect.left) / rect.width) * 100;
+              const y = ((e.clientY - rect.top) / rect.height) * 100;
+              e.currentTarget.style.backgroundSize = '250%';
+              e.currentTarget.style.backgroundPosition = `${x}% ${y}%`;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundSize = '100%';
+              e.currentTarget.style.backgroundPosition = '50% 50%';
+            }}
+            onClick={(e) => {
+              if (zoomLevel === 1) { setShowLightbox(false); return; }
+            }}
+            onWheel={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            style={{
+              position: 'relative', overflow: 'hidden', borderRadius: '12px',
+              width: '90vw', maxWidth: '700px', height: '70vh', maxHeight: '600px',
+              cursor: 'crosshair',
+              backgroundImage: `url(${images[activeImage]})`,
+              backgroundSize: '100%',
+              backgroundPosition: '50% 50%',
+              backgroundRepeat: 'no-repeat',
+              transition: 'background-size 0.15s ease'
+            }}
+          ></div>
+
+          {images.length > 1 && (
+            <button onClick={(e) => { e.stopPropagation(); setActiveImage(a => (a === images.length - 1 ? 0 : a + 1)); setZoomLevel(1); }}
+              style={{ position: 'absolute', right: '20px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.12)', border: 'none', color: 'white', fontSize: '2rem', cursor: 'pointer', zIndex: 10000, width: '50px', height: '50px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >&rsaquo;</button>
+          )}
+
         </div>
       )}
     </div>
