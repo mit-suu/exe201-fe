@@ -775,3 +775,24 @@ textarea { min-height: 96px; resize: vertical; }
 .filters-row { display: flex; gap: 15px; margin-bottom: 24px; align-items: center; flex-wrap: wrap; }
 .filters-row select, .filters-row input { flex: 1; min-width: 200px; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-secondary); outline: none; transition: border-color 200ms; font-family: inherit; color: var(--text); }
 .filters-row select:focus, .filters-row input:focus { border-color: var(--primary); }
+
+/* Google Login */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.auth-divider::before, .auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.google-btn-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 8px;
+}

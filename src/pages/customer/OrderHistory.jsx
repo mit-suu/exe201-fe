@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import StatusBadge from '../../components/StatusBadge.jsx';
 import { getMyOrders, cancelOrder } from '../../services/orders.js';
 import { getCurrentUser } from '../../services/auth.js';
+import ContractModal from '../../components/ContractModal.jsx';
 import { createReview } from '../../services/reviews.js';
 import { Copy, FileText } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -15,6 +16,7 @@ const OrderHistory = () => {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [showContractModal, setShowContractModal] = useState(false);
   const [reviewingOrder, setReviewingOrder] = useState(null);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
@@ -120,13 +122,13 @@ const OrderHistory = () => {
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button 
-                    onClick={() => setSelectedOrder(order)} 
+                    onClick={() => setSelectedOrder(order)}
                     className="button"
                     style={{ minHeight: '38px', fontSize: '0.85rem' }}
                   >
                     Xem chi tiết
                   </button>
-                  {order.status === 'returned' && !reviewedOrderIds.includes(order._id) && (
+                  {order.status === 'Returned' && !reviewedOrderIds.includes(order._id) && (
                     <button 
                       onClick={() => { setReviewingOrder(order); setRating(5); setComment(''); }} 
                       className="button"
@@ -153,35 +155,6 @@ const OrderHistory = () => {
                         </button>
                       </div>
                     </div>
-                  )}
-                  {['Approved', 'Rented', 'Returned', 'Completed'].includes(order.status) && (
-                    <button 
-                      onClick={async () => {
-                        try {
-                          const { getContract } = await import('../../services/orders.js');
-                          const contract = await getContract(order._id);
-                          if (contract) {
-                             // Simulating a contract view
-                             const w = window.open('', '_blank');
-                             w.document.write(`<html><head><title>Hợp Đồng Thuê - ${order._id}</title></head><body style="padding:40px; font-family:sans-serif;">
-                               <h2>Hợp Đồng Thuê Đồ</h2>
-                               <p><strong>Ngày ký:</strong> ${new Date(contract.createdAt).toLocaleDateString()}</p>
-                               <hr/>
-                               <pre style="white-space: pre-wrap; font-family:sans-serif;">${contract.terms}</pre>
-                             </body></html>`);
-                             w.document.close();
-                          }
-                        } catch (e) {
-                           toast.error('Hợp đồng chưa sẵn sàng hoặc lỗi tải.');
-                        }
-                      }}
-                      className="button"
-                      style={{ minHeight: '38px', fontSize: '0.85rem' }}
-                    >
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                        <FileText size={15} style={{ color: '#6b7280' }} /> Hợp đồng
-                      </span>
-                    </button>
                   )}
                   {['pending', 'pending_payment'].includes(order.status) && (
                     <button 
@@ -437,6 +410,17 @@ const OrderHistory = () => {
               </div>
             </div>
 
+            {/* Hợp đồng điện tử */}
+            <button
+              className="button"
+              style={{ marginTop: '16px', width: '100%', fontSize: '0.9rem' }}
+              onClick={() => setShowContractModal(true)}
+            >
+              📄 Xem & Ký Hợp đồng điện tử
+            </button>
+
+            {showContractModal && <ContractModal order={selectedOrder} role="renter" onClose={() => setShowContractModal(false)} />}
+
             <div style={{ display: 'flex', gap: '10px', marginTop: '30px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '20px' }}>
               {['pending', 'pending_payment'].includes(selectedOrder.status) && (
                 <button 
@@ -482,8 +466,8 @@ const OrderHistory = () => {
               setSuccessMsg('');
               const productId = reviewingOrder.product?._id || reviewingOrder.product || reviewingOrder.items?.[0]?.product;
               await createReview({
-                orderId: reviewingOrder._id,
-                productId,
+                rentalOrderId: reviewingOrder._id,
+                type: 'RenterToItem',
                 rating,
                 comment
               });

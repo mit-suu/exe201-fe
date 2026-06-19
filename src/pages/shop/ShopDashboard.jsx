@@ -9,6 +9,7 @@ import { getMyNotifications, markNotificationRead } from '../../services/notific
 import { getProfile, updateProfile, updateLenderProfile } from '../../services/profile.js';
 import GoogleMapsPicker from '../../components/GoogleMapsPicker.jsx';
 import { clearSession } from '../../services/auth.js';
+import ContractModal from '../../components/ContractModal.jsx';
 import { connectSocket, disconnectSocket } from '../../services/socket.js';
 import { getBalance, updateBankAccount, withdrawWallet, depositWallet, getTransactions } from '../../services/wallet.js';
 import { QRCodeCanvas } from 'qrcode.react';
@@ -98,6 +99,7 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
   const [customSize, setCustomSize] = useState('');
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [showContractModal, setShowContractModal] = useState(false);
 
   // Operational Modal States
   const [checkingInOrder, setCheckingInOrder] = useState(null);
@@ -210,12 +212,8 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
         }
       });
     }
-
-    
-  return () => {
-      disconnectSocket();
-    };
   }, []);
+
 
   const handleBankSubmit = async (e) => {
     e.preventDefault();
@@ -710,40 +708,6 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
             </div>
           </div>
         )}
-        <section className="card admin-hero-card" style={{ background: 'white' }}>
-          <div>
-            <p className="eyebrow">Cửa hàng BuildLab</p>
-            <h1>{menuItems.find(item => item.id === activeTab)?.label}</h1>
-            <p>Quản lý trang phục cho thuê, theo dõi trạng thái giao nhận đơn thuê và thiết lập chính sách bán hàng.</p>
-          </div>
-        </section>
-
-        {wallet && platformConfig && wallet.balance < -(platformConfig.maxDebtLimit !== undefined ? platformConfig.maxDebtLimit : 5000000) && (
-          <div className="alert" style={{ background: '#fef2f2', color: '#991b1b', border: '1px solid #fee2e2', padding: '20px', borderRadius: '14px', marginBottom: '20px', boxShadow: '0 4px 15px rgba(220, 38, 38, 0.08)' }}>
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-              <AlertTriangle size={24} style={{ color: '#b91c1c', flexShrink: 0 }} />
-              <div>
-                <strong style={{ display: 'block', fontSize: '1.05rem', marginBottom: '6px' }}>CỬA HÀNG ĐANG TẠM NGƯNG HOẠT ĐỘNG (BỊ KHÓA DO NỢ PHÍ SÀN)</strong>
-                <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: '1.5', opacity: 0.9 }}>
-                  Cửa hàng của bạn đang nợ hệ thống: <strong style={{ textDecoration: 'underline' }}>{money(Math.abs(wallet.balance))} đ</strong> (Số dư ví: <strong>{money(wallet.balance)} đ</strong>).
-                </p>
-                <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', lineHeight: '1.5', opacity: 0.9 }}>
-                  Hạn mức nợ phí sàn tối đa cho phép là <strong>-{money(platformConfig.maxDebtLimit !== undefined ? platformConfig.maxDebtLimit : 5000000)} đ</strong>. Vì đã vượt quá hạn mức nợ, toàn bộ sản phẩm của shop hiện đã bị ẩn khỏi trang chủ.
-                </p>
-                <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', lineHeight: '1.5', opacity: 0.9, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Info size={16} /> Vui lòng nạp tối thiểu {money(Math.abs(wallet.balance))} đ để số dư ví trở lại mức an toàn và kích hoạt lại cửa hàng ngay lập tức.
-                </p>
-                <button
-                  onClick={() => { setActiveTab('revenue'); navigate('/shop/revenue'); }}
-                  className="button"
-                  style={{ marginTop: '12px', background: '#991b1b', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}
-                >
-                  Thanh toán nợ ngay →
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {user?.lenderProfile?.status === 'Pending' && (
           <div className="alert" style={{ background: '#fffbeb', color: '#b45309', border: '1px solid #fcd34d', marginBottom: '20px' }}>
@@ -824,16 +788,28 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                 <strong>Thông tin khách hàng:</strong>
                 <p style={{ margin: '4px 0' }}><strong>{selectedOrder.renter?.fullName || selectedOrder.user?.fullName}</strong></p>
                 <p style={{ margin: '2px 0', color: 'var(--muted)' }}>Email: {selectedOrder.renter?.email || selectedOrder.user?.email}</p>
-                <p style={{ margin: '2px 0', color: 'var(--muted)' }}>SĐT: {selectedOrder.renter?.phone || selectedOrder.user?.phone || 'N/A'}</p>
-                <p style={{ margin: '2px 0', color: 'var(--muted)' }}>Địa chỉ: {selectedOrder.renter?.address || selectedOrder.user?.address || 'N/A'}</p>
+                <p style={{ margin: '2px 0', color: 'var(--muted)' }}>SĐT: {selectedOrder.shippingAddress?.phone || selectedOrder.renter?.phone || selectedOrder.user?.phone || 'N/A'}</p>
+                <p style={{ margin: '2px 0', color: 'var(--muted)' }}>Địa chỉ giao: {selectedOrder.shippingAddress?.address || 'N/A'}</p>
+                <p style={{ margin: '2px 0', color: 'var(--muted)' }}>Người nhận: {selectedOrder.shippingAddress?.fullName || 'N/A'}</p>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <strong>Thời gian thuê:</strong>
-                <p style={{ margin: '4px 0' }}>Từ: <strong>{date(selectedOrder.rentalStartDate)}</strong></p>
-                <p style={{ margin: '2px 0' }}>Đến: <strong>{date(selectedOrder.rentalEndDate)}</strong></p>
-                <p style={{ margin: '2px 0', color: 'var(--muted)' }}>Tổng cộng: {selectedOrder.rentalDays} ngày</p>
+                <p style={{ margin: '4px 0' }}>Từ: <strong>{date(selectedOrder.startDate || selectedOrder.rentalStartDate)}</strong></p>
+                <p style={{ margin: '2px 0' }}>Đến: <strong>{date(selectedOrder.endDate || selectedOrder.rentalEndDate)}</strong></p>
+                <p style={{ margin: '2px 0', color: 'var(--muted)' }}>Tổng cộng: {selectedOrder.pricing?.rentalDays || selectedOrder.rentalDays} ngày</p>
+                {selectedOrder.actualReturnDate && <p style={{ margin: '2px 0', color: 'var(--success)' }}>Trả thực tế: {date(selectedOrder.actualReturnDate)}</p>}
+                <p style={{ margin: '2px 0', color: 'var(--muted)' }}>Thanh toán: <StatusBadge status={selectedOrder.paymentStatus} /></p>
               </div>
             </div>
+
+            {/* QR Code & Token */}
+            {selectedOrder.status === 'Approved' && selectedOrder.qrCodeToken && (
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '16px', padding: '16px', marginBottom: '20px', textAlign: 'center' }}>
+                <strong style={{ fontSize: '0.9rem' }}>Mã QR Check-in (đưa cho khách quét)</strong>
+                <p style={{ fontSize: '0.78rem', color: 'var(--muted)', margin: '4px 0 10px' }}>Token: <code style={{ background: '#fff', padding: '2px 8px', borderRadius: '4px', userSelect: 'all' }}>{selectedOrder.qrCodeToken}</code></p>
+                <QRCodeCanvas value={selectedOrder.qrCodeToken} size={140} style={{ background: 'white', padding: '8px', borderRadius: '12px', border: '1px solid var(--border)' }} />
+              </div>
+            )}
 
             {/* Items Table */}
             <div style={{ border: '1px solid var(--border)', borderRadius: '18px', overflow: 'hidden', marginBottom: '20px' }}>
@@ -843,74 +819,92 @@ const ShopDashboard = ({ tab = 'dashboard', user }) => {
                     <th style={{ padding: '12px' }}>Trang phục</th>
                     <th style={{ padding: '12px', textAlign: 'center' }}>Size</th>
                     <th style={{ padding: '12px', textAlign: 'right' }}>Giá thuê/ngày</th>
+                    <th style={{ padding: '12px', textAlign: 'right' }}>Số ngày</th>
                     <th style={{ padding: '12px', textAlign: 'right' }}>Tạm tính</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(selectedOrder.items && selectedOrder.items.length > 0 ? selectedOrder.items : [
-                    {
-                      name: selectedOrder.product?.name || 'Trang phục thuê',
-                      size: selectedOrder.size || 'N/A',
-                      rentalPrice: selectedOrder.product?.rentalPrice || 0,
-                      subtotal: selectedOrder.subtotal || 0
-                    }
-                  ]).map((item, idx) => (
-                    <tr style={{ borderBottom: '1px solid var(--border)' }} key={idx}>
-                      <td style={{ padding: '12px', fontWeight: '800' }}>{item.name}</td>
-                      <td style={{ padding: '12px', textAlign: 'center' }}>{item.size}</td>
-                      <td style={{ padding: '12px', textAlign: 'right' }}>{money(item.rentalPrice || selectedOrder.pricing?.rentalFee)} đ</td>
-                      <td style={{ padding: '12px', textAlign: 'right', fontWeight: '800' }}>{money(item.subtotal || selectedOrder.pricing?.rentalFee)} đ</td>
-                    </tr>
-                  ))}
+                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '12px', fontWeight: '800' }}>{selectedOrder.product?.name || 'Trang phục thuê'}</td>
+                    <td style={{ padding: '12px', textAlign: 'center' }}>{selectedOrder.product?.size || selectedOrder.size || 'N/A'}</td>
+                    <td style={{ padding: '12px', textAlign: 'right' }}>{money(selectedOrder.pricing?.rentalFee / (selectedOrder.pricing?.rentalDays || 1))} đ</td>
+                    <td style={{ padding: '12px', textAlign: 'center' }}>{selectedOrder.pricing?.rentalDays || 1}</td>
+                    <td style={{ padding: '12px', textAlign: 'right', fontWeight: '800' }}>{money(selectedOrder.pricing?.rentalFee)} đ</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
 
             {/* Invoice billing details */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px', fontSize: '0.9rem' }}>
+            <div style={{ display: 'grid', gap: '20px', fontSize: '0.9rem' }}>
               <div>
                 <strong>Ghi chú từ khách:</strong>
                 <p style={{ fontStyle: 'italic', color: 'var(--muted)', marginTop: '4px' }}>
                   "{selectedOrder.note || 'Không có ghi chú.'}"
                 </p>
               </div>
-              <div>
+              <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
-                  <span>Tạm tính thuê:</span>
-                  <strong>{money(selectedOrder.pricing?.rentalFee || selectedOrder.subtotal)} đ</strong>
+                  <span>Tiền thuê ({selectedOrder.pricing?.rentalDays || 1} ngày):</span>
+                  <strong>{money(selectedOrder.pricing?.rentalFee)} đ</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
-                  <span>Tiền đặt cọc:</span>
-                  <strong>{money(selectedOrder.pricing?.depositFee || selectedOrder.depositPrice)} đ</strong>
+                  <span>Tiền đặt cọc (hoàn trả):</span>
+                  <strong>{money(selectedOrder.pricing?.depositFee)} đ</strong>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
-                  <span>Phí phụ thu:</span>
-                  <span>+ {money((selectedOrder.pricing?.lateFee || 0) + (selectedOrder.pricing?.damageFee || 0) + (selectedOrder.pricing?.shippingFee || 0) || selectedOrder.extraFee || 0)} đ</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0 0', fontSize: '1.15rem' }}>
+                {(selectedOrder.pricing?.insuranceFee > 0) && <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+                  <span>Phí bảo hiểm:</span>
+                  <span>+ {money(selectedOrder.pricing.insuranceFee)} đ</span>
+                </div>}
+                {(selectedOrder.pricing?.shippingFee > 0) && <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+                  <span>Phí vận chuyển:</span>
+                  <span>+ {money(selectedOrder.pricing.shippingFee)} đ</span>
+                </div>}
+                {(selectedOrder.pricing?.lateFee > 0) && <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', color: 'var(--danger)' }}>
+                  <span>Phí trễ hạn:</span>
+                  <span>+ {money(selectedOrder.pricing.lateFee)} đ</span>
+                </div>}
+                {(selectedOrder.pricing?.damageFee > 0) && <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', color: 'var(--danger)' }}>
+                  <span>Phí hư hỏng:</span>
+                  <span>+ {money(selectedOrder.pricing.damageFee)} đ</span>
+                </div>}
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0 0', borderTop: '2px solid var(--border)', fontSize: '1.15rem' }}>
                   <span style={{ fontWeight: '850' }}>Tổng khách trả:</span>
                   <strong>{money(selectedOrder.pricing?.totalAmount || selectedOrder.totalAmount)} đ</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0 0', fontSize: '1.15rem' }}>
-                  <span style={{ fontWeight: '850' }}>Thực nhận (trừ phí sàn):</span>
+                  <span style={{ fontWeight: '850' }}>Thực nhận (sau phí sàn):</span>
                   <strong style={{ color: 'var(--accent)' }}>{money(selectedOrder.pricing?.lenderRevenue)} đ</strong>
                 </div>
               </div>
             </div>
 
+            {/* Contract Section */}
+            <div style={{ marginBottom: '20px', marginTop: '20px', border: '1px solid var(--border)', borderRadius: '16px', padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <strong style={{ fontSize: '0.95rem' }}>📄 Hợp đồng điện tử</strong>
+                <p style={{ margin: '2px 0 0', fontSize: '0.82rem', color: 'var(--muted)' }}>Ký hợp đồng giữa shop và người thuê</p>
+              </div>
+              <button className="primary-button" style={{ padding: '8px 16px', fontSize: '0.85rem' }} onClick={() => setShowContractModal(true)}>
+                Xem & Ký hợp đồng
+              </button>
+            </div>
+
+            {showContractModal && <ContractModal order={selectedOrder} role="lender" onClose={() => setShowContractModal(false)} />}
+
             {/* Quick Actions in Detail Modal */}
             <div style={{ display: 'flex', gap: '10px', marginTop: '30px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '20px' }}>
-              {selectedOrder.status === 'pending' && (
+              {selectedOrder.status === 'Pending' && (
                 <>
-                  <button onClick={() => handleStatusChange(selectedOrder._id, 'confirmed')} className="primary-button" style={{ minHeight: '44px' }}>Duyệt nhận đơn</button>
-                  <button onClick={() => handleStatusChange(selectedOrder._id, 'rejected')} className="primary-button danger" style={{ minHeight: '44px' }}>Từ chối đơn</button>
+                  <button onClick={() => handleStatusChange(selectedOrder._id, 'Approved')} className="primary-button" style={{ minHeight: '44px' }}>Duyệt nhận đơn</button>
+                  <button onClick={() => handleStatusChange(selectedOrder._id, 'Rejected')} className="primary-button danger" style={{ minHeight: '44px' }}>Từ chối đơn</button>
                 </>
               )}
-              {selectedOrder.status === 'confirmed' && (
-                <button onClick={() => handleStatusChange(selectedOrder._id, 'renting')} className="primary-button" style={{ minHeight: '44px' }}>Khách đã nhận đồ (Renting)</button>
+              {selectedOrder.status === 'Approved' && (
+                <button onClick={() => handleStatusChange(selectedOrder._id, 'Rented')} className="primary-button" style={{ minHeight: '44px' }}>Khách đã nhận đồ (Rented)</button>
               )}
-              {selectedOrder.status === 'renting' && (
-                <button onClick={() => handleStatusChange(selectedOrder._id, 'returned')} className="primary-button" style={{ minHeight: '44px' }}>Khách đã trả đồ thành công</button>
+              {selectedOrder.status === 'Rented' && (
+                <button onClick={() => handleStatusChange(selectedOrder._id, 'Returned')} className="primary-button" style={{ minHeight: '44px' }}>Khách đã trả đồ thành công</button>
               )}
               <button onClick={() => setSelectedOrder(null)} className="secondary-button" style={{ minHeight: '44px' }}>Đóng</button>
             </div>

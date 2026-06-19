@@ -53,7 +53,7 @@ const NotificationsTab = (props) => {
                     <strong style={{ display: 'block', fontSize: '1rem', color: 'var(--primary-strong)' }}>
                       {!n.isRead && <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#9ca3af', marginRight: '6px', verticalAlign: 'middle' }}></span>}{n.title}
                     </strong>
-                    <p style={{ margin: '4px 0 0', fontSize: '0.88rem', color: 'var(--muted)' }}>{n.body}</p>
+                    <p style={{ margin: '4px 0 0', fontSize: '0.88rem', color: 'var(--muted)' }}>{n.body || n.message}</p>
                     <span style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginTop: '6px' }}>
                       {new Date(n.createdAt).toLocaleString('vi-VN')}
                     </span>
