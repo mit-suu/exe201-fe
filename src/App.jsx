@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar.jsx';
 import Footer from './components/Footer.jsx';
 import AiAssistant from './components/AiAssistant.jsx';
+import AnalyticsTracker from './components/AnalyticsTracker.jsx';
 import Home from './pages/customer/Home.jsx';
 import Login from './pages/auth/Login.jsx';
 import Register from './pages/auth/Register.jsx';
@@ -13,10 +14,10 @@ import SupportChat from './pages/customer/SupportChat.jsx';
 import AdminDashboard from './pages/admin/AdminDashboard.jsx';
 import ShopDashboard from './pages/shop/ShopDashboard.jsx';
 import ProductDetail from './pages/customer/ProductDetail.jsx';
-import Cart from './pages/customer/Cart.jsx';
 import PaymentResult from './pages/customer/PaymentResult.jsx';
 import MyWallet from './pages/customer/MyWallet.jsx';
 import PartnerRegister from './pages/auth/PartnerRegister.jsx';
+import Cart from './pages/customer/Cart.jsx';
 import { getCurrentUser } from './services/auth.js';
 import { Toaster } from 'react-hot-toast';
 import { usePageTracking } from './hooks/useAnalytics.js';
@@ -41,6 +42,7 @@ function App() {
 
   return (
     <div className="app-shell">
+      <AnalyticsTracker />
       <Navbar user={user} />
       <main className="app-main">
         <Routes>
