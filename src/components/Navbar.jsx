@@ -1,15 +1,44 @@
+import { useState, useEffect } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { clearSession, getCurrentUser } from '../services/auth.js';
-import { Home, Shirt, ShoppingBag, Wallet, User, Store, LogIn, UserPlus, Settings, LogOut, LayoutDashboard, MessageCircle, BarChart3, KeyRound } from 'lucide-react';
+import { getMyNotifications, markNotificationRead } from '../services/notifications.js';
+import { connectSocket, disconnectSocket } from '../services/socket.js';
+import { Home, Shirt, ShoppingBag, Wallet, User, Store, LogIn, UserPlus, Settings, LogOut, LayoutDashboard, MessageCircle, BarChart3, KeyRound, Bell } from 'lucide-react';
 import { useCart } from '../hooks/useCart.js';
 import { useTranslation } from 'react-i18next';
 import { Globe } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 const Navbar = ({ user }) => {
   const { cart } = useCart();
   const navigate = useNavigate();
   const currentUser = user ?? getCurrentUser();
   const { t, i18n } = useTranslation();
+  const [notifications, setNotifications] = useState([]);
+  const [showNotif, setShowNotif] = useState(false);
+
+  useEffect(() => {
+    if (currentUser) {
+      getMyNotifications().then(data => setNotifications(Array.isArray(data) ? data : [])).catch(() => {});
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    const socket = connectSocket();
+    if (socket) {
+      socket.on('new_order', (data) => {
+        toast.success(`Bạn vừa có đơn thuê mới: ${data.productName}`);
+        getMyNotifications().then(d => setNotifications(Array.isArray(d) ? d : []));
+      });
+      socket.on('order_updated', (data) => {
+        toast.info(data.message || 'Đơn hàng có cập nhật mới!');
+        getMyNotifications().then(d => setNotifications(Array.isArray(d) ? d : []));
+      });
+    }
+    return () => { if (socket) disconnectSocket(); };
+  }, []);
+
+  const unreadCount = notifications.filter(n => !n.isRead).length;
 
   const toggleLanguage = () => {
     i18n.changeLanguage(i18n.language.startsWith('vi') ? 'en' : 'vi');
@@ -83,6 +112,53 @@ const Navbar = ({ user }) => {
             <Link className="nav-button nav-highlight" to="/partner-register" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
               <Store size={18} /> {t('navbar.openShop')}
             </Link>
+          )}
+
+          {/* Auth Button/Dropdown */}
+          {currentUser && (
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowNotif(!showNotif)}
+                style={{ position: 'relative', background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex' }}
+                aria-label="Thông báo"
+              >
+                <Bell size={20} />
+                {unreadCount > 0 && (
+                  <span style={{ position: 'absolute', top: '-4px', right: '-4px', background: '#dc2626', color: 'white', borderRadius: '50%', width: '16px', height: '16px', fontSize: '0.6rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+              {showNotif && (
+                <div style={{ position: 'absolute', top: '100%', right: 0, width: '340px', maxHeight: '400px', overflowY: 'auto', background: 'white', border: '1px solid var(--border)', borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.12)', zIndex: 1000, marginTop: '8px' }}>
+                  <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: '0.9rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Thông báo</span>
+                    {unreadCount > 0 && <span style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>{unreadCount} chưa đọc</span>}
+                  </div>
+                  {notifications.length === 0 && <div style={{ padding: '20px', textAlign: 'center', color: 'var(--muted)', fontSize: '0.85rem' }}>Chưa có thông báo nào</div>}
+                  {notifications.map(n => (
+                    <button
+                      key={n._id}
+                      onClick={async () => {
+                        if (!n.isRead) await markNotificationRead(n._id);
+                        getMyNotifications().then(d => setNotifications(Array.isArray(d) ? d : []));
+                        setShowNotif(false);
+                      }}
+                      style={{ display: 'block', width: '100%', textAlign: 'left', padding: '12px 16px', border: 'none', borderBottom: '1px solid #f0f0f0', background: n.isRead ? 'white' : '#f0f7ff', cursor: 'pointer', fontSize: '0.85rem' }}
+                    >
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        {!n.isRead && <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#9ca3af', flexShrink: 0, marginTop: '6px' }}></span>}
+                        <div>
+                          <div style={{ fontWeight: n.isRead ? 400 : 600 }}>{n.title || 'Thông báo'}</div>
+                          <div style={{ color: 'var(--muted)', fontSize: '0.78rem', marginTop: '2px' }}>{n.message}</div>
+                          <div style={{ color: '#9ca3af', fontSize: '0.7rem', marginTop: '3px' }}>{new Date(n.createdAt).toLocaleDateString('vi-VN')}</div>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
           {/* Auth Button/Dropdown */}

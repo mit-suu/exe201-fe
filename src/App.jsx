@@ -22,22 +22,30 @@ import { Toaster } from 'react-hot-toast';
 import { usePageTracking } from './hooks/useAnalytics.js';
 import FeedbackWidget from './components/FeedbackWidget.jsx';
 
-const getPrimaryRole = (user) => user?.role || user?.roles?.[0] || null;
+const getPrimaryRole = (user) => {
+  const roles = user?.roles || [];
+  if (roles.includes('admin')) return 'admin';
+  if (roles.includes('lender') || roles.includes('both')) return 'lender';
+  return roles[0] || null;
+};
 const hasRole = (user, role) => user?.role === role || user?.roles?.includes(role);
+const isAdmin = (user) => hasRole(user, 'admin');
+const isLender = (user) => hasRole(user, 'lender') || hasRole(user, 'both');
 
 function App() {
   usePageTracking();
   const user = getCurrentUser();
   const primaryRole = getPrimaryRole(user);
-  const isShop = hasRole(user, 'lender') || hasRole(user, 'both');
+  const isShop = isLender(user);
+  const isUserAdmin = isAdmin(user);
 
   return (
     <div className="app-shell">
       <Navbar user={user} />
       <main className="app-main">
         <Routes>
-          <Route path="/" element={primaryRole === 'admin' ? <Navigate to="/admin" replace /> : isShop ? <Navigate to="/shop/dashboard" replace /> : <Home />} />
-          <Route path="/login" element={<Login />} />
+          <Route path="/" element={isUserAdmin ? <Navigate to="/admin" replace /> : isShop ? <Navigate to="/shop/dashboard" replace /> : <Home />} />
+          <Route path="/login" element={user ? <Navigate to={isUserAdmin ? '/admin' : isShop ? '/shop/dashboard' : '/'} replace /> : <Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/partner-register" element={<PartnerRegister />} />
           <Route path="/products" element={<Products />} />
@@ -47,7 +55,7 @@ function App() {
           <Route path="/orders/history" element={user ? <OrderHistory /> : <Navigate to="/login" replace />} />
           <Route path="/my-wallet" element={user ? <MyWallet /> : <Navigate to="/login" replace />} />
           <Route path="/support-chat" element={user ? <SupportChat /> : <Navigate to="/login" replace />} />
-          <Route path="/dashboard" element={<Navigate to={primaryRole === 'admin' ? '/admin' : isShop ? '/shop/dashboard' : '/'} replace />} />
+          <Route path="/dashboard" element={<Navigate to={isUserAdmin ? '/admin' : isShop ? '/shop/dashboard' : '/'} replace />} />
           <Route path="/shop/dashboard" element={isShop ? <ShopDashboard tab="dashboard" user={user} /> : <Navigate to="/login" replace />} />
           <Route path="/shop/costumes" element={isShop ? <ShopDashboard tab="costumes" user={user} /> : <Navigate to="/login" replace />} />
           <Route path="/shop/orders" element={isShop ? <ShopDashboard tab="orders" user={user} /> : <Navigate to="/login" replace />} />

@@ -54,18 +54,22 @@ const OrdersTab = (props) => {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <StatusBadge status={o.status} />
-                      <select
-                        value={o.status}
-                        onChange={(e) => handleStatusChange(o._id, e.target.value)}
-                        style={{ padding: '6px', fontSize: '0.8rem', width: '150px' }}
-                      >
-                        <option value="Pending">Chờ xác nhận (Pending)</option>
-                        <option value="Approved">Đã xác nhận (Approved)</option>
-                        <option value="Rented">Đang thuê (Rented)</option>
-                        <option value="Returned">Đã trả đồ (Returned)</option>
-                        <option value="Canceled">Hủy đơn (Canceled)</option>
-                        <option value="Rejected">Từ chối (Rejected)</option>
-                      </select>
+                      {['Canceled','Rejected','Returned','Completed'].includes(o.status) ? (
+                        <StatusBadge status={o.status} />
+                      ) : (
+                        <select
+                          value={o.status}
+                          onChange={(e) => handleStatusChange(o._id, e.target.value)}
+                          style={{ padding: '6px', fontSize: '0.8rem', width: '165px' }}
+                        >
+                          <option value="Pending" disabled={o.status !== 'Pending'}>Chờ xác nhận</option>
+                          <option value="Approved" disabled={o.status !== 'Pending'}>✓ Xác nhận</option>
+                          <option value="Rented" disabled={o.status !== 'Approved'}>→ Đang thuê</option>
+                          <option value="Returned" disabled={o.status !== 'Rented'}>→ Đã trả đồ</option>
+                          <option value="Canceled" disabled={!['Pending','Approved'].includes(o.status)}>✗ Hủy đơn</option>
+                          <option value="Rejected" disabled={o.status !== 'Pending'}>✗ Từ chối</option>
+                        </select>
+                      )}
                     </div>
                     <div style={{ display: 'flex', gap: '6px' }}>
                       <button onClick={() => setSelectedOrder(o)} className="button" style={{ minHeight: '36px', fontSize: '0.82rem' }}>Chi tiết</button>

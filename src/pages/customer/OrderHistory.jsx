@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import StatusBadge from '../../components/StatusBadge.jsx';
-import { getMyOrders, cancelOrder } from '../../services/orders.js';
+import { getMyOrders, cancelOrder, extendOrder } from '../../services/orders.js';
 import { getCurrentUser } from '../../services/auth.js';
+import ContractModal from '../../components/ContractModal.jsx';
 import { createReview } from '../../services/reviews.js';
 import { Copy, FileText } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -15,6 +16,10 @@ const OrderHistory = () => {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [showContractModal, setShowContractModal] = useState(false);
+  const [showExtendModal, setShowExtendModal] = useState(false);
+  const [extendDate, setExtendDate] = useState('');
+  const [extending, setExtending] = useState(false);
   const [reviewingOrder, setReviewingOrder] = useState(null);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
@@ -120,13 +125,13 @@ const OrderHistory = () => {
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button 
-                    onClick={() => setSelectedOrder(order)} 
+                    onClick={() => setSelectedOrder(order)}
                     className="button"
                     style={{ minHeight: '38px', fontSize: '0.85rem' }}
                   >
                     Xem chi tiết
                   </button>
-                  {order.status === 'returned' && !reviewedOrderIds.includes(order._id) && (
+                  {order.status === 'Returned' && !reviewedOrderIds.includes(order._id) && (
                     <button 
                       onClick={() => { setReviewingOrder(order); setRating(5); setComment(''); }} 
                       className="button"
@@ -154,35 +159,6 @@ const OrderHistory = () => {
                       </div>
                     </div>
                   )}
-                  {['Approved', 'Rented', 'Returned', 'Completed'].includes(order.status) && (
-                    <button 
-                      onClick={async () => {
-                        try {
-                          const { getContract } = await import('../../services/orders.js');
-                          const contract = await getContract(order._id);
-                          if (contract) {
-                             // Simulating a contract view
-                             const w = window.open('', '_blank');
-                             w.document.write(`<html><head><title>Hợp Đồng Thuê - ${order._id}</title></head><body style="padding:40px; font-family:sans-serif;">
-                               <h2>Hợp Đồng Thuê Đồ</h2>
-                               <p><strong>Ngày ký:</strong> ${new Date(contract.createdAt).toLocaleDateString()}</p>
-                               <hr/>
-                               <pre style="white-space: pre-wrap; font-family:sans-serif;">${contract.terms}</pre>
-                             </body></html>`);
-                             w.document.close();
-                          }
-                        } catch (e) {
-                           toast.error('Hợp đồng chưa sẵn sàng hoặc lỗi tải.');
-                        }
-                      }}
-                      className="button"
-                      style={{ minHeight: '38px', fontSize: '0.85rem' }}
-                    >
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                        <FileText size={15} style={{ color: '#6b7280' }} /> Hợp đồng
-                      </span>
-                    </button>
-                  )}
                   {['pending', 'pending_payment'].includes(order.status) && (
                     <button 
                       onClick={() => handleCancelOrder(order._id)} 
@@ -205,21 +181,9 @@ const OrderHistory = () => {
                       Báo cáo / Khiếu nại
                     </button>
                   )}
-                  {order.status === 'rented' && (
-                    <button 
-                      onClick={async () => {
-                        const newEndDate = window.prompt('Nhập ngày bạn muốn gia hạn đến (YYYY-MM-DD):');
-                        if (newEndDate) {
-                          try {
-                            const { extendOrder } = await import('../../services/orders.js');
-                            await extendOrder(order._id, newEndDate);
-                            toast.success('Đã gửi yêu cầu gia hạn thành công.');
-                            loadOrders();
-                          } catch (err) {
-                            toast.error('Lỗi: ' + (err?.response?.data?.message || err.message));
-                          }
-                        }
-                      }} 
+                  {order.status === 'Rented' && (
+                    <button
+                      onClick={() => { setSelectedOrder(order); setExtendDate(order.endDate?.slice(0,10) || ''); setShowExtendModal(true); }}
                       className="button"
                       style={{ minHeight: '38px', fontSize: '0.85rem' }}
                     >
@@ -437,6 +401,17 @@ const OrderHistory = () => {
               </div>
             </div>
 
+            {/* Hợp đồng điện tử */}
+            <button
+              className="button"
+              style={{ marginTop: '16px', width: '100%', fontSize: '0.9rem' }}
+              onClick={() => setShowContractModal(true)}
+            >
+              📄 Xem & Ký Hợp đồng điện tử
+            </button>
+
+            {showContractModal && <ContractModal order={selectedOrder} role="renter" onClose={() => setShowContractModal(false)} />}
+
             <div style={{ display: 'flex', gap: '10px', marginTop: '30px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '20px' }}>
               {['pending', 'pending_payment'].includes(selectedOrder.status) && (
                 <button 
@@ -482,8 +457,8 @@ const OrderHistory = () => {
               setSuccessMsg('');
               const productId = reviewingOrder.product?._id || reviewingOrder.product || reviewingOrder.items?.[0]?.product;
               await createReview({
-                orderId: reviewingOrder._id,
-                productId,
+                rentalOrderId: reviewingOrder._id,
+                type: 'RenterToItem',
                 rating,
                 comment
               });
@@ -621,6 +596,36 @@ const OrderHistory = () => {
               <button className="primary-button danger" type="submit">Gửi khiếu nại</button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Extend Modal */}
+      {showExtendModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div className="card" style={{ width: 'min(450px, 100%)', background: 'white', borderRadius: '24px', padding: '30px', position: 'relative' }}>
+            <button onClick={() => setShowExtendModal(false)} style={{ position: 'absolute', top: '20px', right: '20px', width: '36px', height: '36px', borderRadius: '50%', background: 'var(--surface-soft)', border: '0', fontSize: '1.2rem', display: 'grid', placeItems: 'center' }}>×</button>
+            <h2 style={{ margin: '0 0 10px' }}>Gia hạn thuê</h2>
+            <p style={{ color: 'var(--muted)', fontSize: '0.9rem', marginBottom: '20px' }}>Đơn #{(selectedOrder?._id || '').slice(-8).toUpperCase()} — Chọn ngày trả mới.</p>
+            <div className="input-group">
+              <label>Ngày trả mới (hiện tại: {selectedOrder?.endDate?.slice(0,10)})</label>
+              <input type="date" value={extendDate} min={selectedOrder?.endDate?.slice(0,10)} onChange={(e) => setExtendDate(e.target.value)} />
+            </div>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowExtendModal(false)} className="secondary-button">Hủy</button>
+              <button onClick={async () => {
+                if (!extendDate) return toast.error('Chọn ngày trả mới');
+                try {
+                  setExtending(true);
+                  await extendOrder(selectedOrder._id, extendDate);
+                  toast.success('Gia hạn thành công!');
+                  setShowExtendModal(false);
+                  loadOrders();
+                } catch (e) {
+                  toast.error(e?.response?.data?.message || 'Lỗi gia hạn');
+                } finally { setExtending(false); }
+              }} className="primary-button" disabled={extending}>{extending ? 'Đang xử lý...' : 'Xác nhận gia hạn'}</button>
+            </div>
+          </div>
         </div>
       )}
     </section>
