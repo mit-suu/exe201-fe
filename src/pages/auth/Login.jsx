@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import api from '../../services/api.js';
 import { saveSession } from '../../services/auth.js';
+import { ANALYTICS_EVENTS, trackEvent as trackGAEvent } from '../../utils/analytics.js';
 
 const GOOGLE_CLIENT_ID = '963268003293-cffckh6o68llm8e0fc42499b0l86587s.apps.googleusercontent.com';
 
@@ -41,6 +42,10 @@ const Login = () => {
       const res = await api.post('/auth/google', { idToken: response.credential });
       const loggedInUser = res.data.data.user;
       saveSession(loggedInUser, res.data.data.accessToken);
+      trackGAEvent(ANALYTICS_EVENTS.LOGIN, {
+        method: 'google',
+        user_role: loggedInUser?.role || loggedInUser?.roles?.[0],
+      });
       const roles = loggedInUser?.roles || [];
       const isAdmin = roles.includes('admin');
       const isShop = !isAdmin && (roles.includes('lender') || roles.includes('both'));
@@ -62,6 +67,10 @@ const Login = () => {
       const response = await api.post('/auth/login', form);
       const loggedInUser = response.data.data.user;
       saveSession(loggedInUser, response.data.data.accessToken);
+      trackGAEvent(ANALYTICS_EVENTS.LOGIN, {
+        method: 'email',
+        user_role: loggedInUser?.role || loggedInUser?.roles?.[0],
+      });
       const roles = loggedInUser?.roles || [];
       const isAdmin = roles.includes('admin');
       const isShop = !isAdmin && (roles.includes('lender') || roles.includes('both'));

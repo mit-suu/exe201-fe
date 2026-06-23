@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { MessageSquarePlus, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { submitFeedback } from '../services/feedbacks.js';
+import { ANALYTICS_EVENTS, trackEvent as trackGAEvent } from '../utils/analytics.js';
 
 const FeedbackWidget = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -19,6 +20,11 @@ const FeedbackWidget = () => {
     try {
       setLoading(true);
       await submitFeedback(formData);
+      trackGAEvent(ANALYTICS_EVENTS.SUBMIT_FEEDBACK, {
+        feedback_type: formData.type,
+        title_length: formData.title.length,
+        content_length: formData.content.length,
+      });
       toast.success('Cảm ơn bạn đã góp ý! Chúng tôi sẽ xem xét sớm nhất.');
       setIsOpen(false);
       setFormData({ type: 'Bug', title: '', content: '' });
