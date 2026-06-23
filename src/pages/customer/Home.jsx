@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import ProductCard from '../../components/ProductCard.jsx';
 import { listProducts, listCategories, listSizes } from '../../services/products.js';
 import { trackEvent } from '../../hooks/useAnalytics.js';
+import { ANALYTICS_EVENTS, trackEvent as trackGAEvent } from '../../utils/analytics.js';
 
 const categories = [
   { value: 'traditional', title: 'Áo dài & truyền thống', text: 'Trang phục chụp ảnh, lễ hỏi, kỷ yếu và sự kiện văn hóa.' },
@@ -71,6 +72,12 @@ const Home = () => {
     const delay = setTimeout(() => {
       if (filters.q) {
         trackEvent('SEARCH', `Tìm kiếm ở trang chủ: ${filters.q}`, { query: filters.q, category: filters.category });
+        trackGAEvent(ANALYTICS_EVENTS.SEARCH_PRODUCT, {
+          query: filters.q,
+          category: filters.category,
+          size: filters.size,
+          results_count: products.length,
+        });
       }
     }, 1000);
     return () => clearTimeout(delay);
@@ -125,7 +132,14 @@ const Home = () => {
         </div>
         <div className="category-grid">
           {categories.map((category) => (
-            <button key={category.value} className="category-card" onClick={() => setFilters({ ...filters, category: category.value })}>
+            <button key={category.value} className="category-card" onClick={() => {
+              setFilters({ ...filters, category: category.value });
+              trackGAEvent(ANALYTICS_EVENTS.APPLY_FILTER, {
+                filter_name: 'category',
+                filter_value: category.value,
+                source: 'home_category_card',
+              });
+            }}>
               <span>{category.title}</span>
               <p>{category.text}</p>
             </button>
@@ -144,13 +158,27 @@ const Home = () => {
 
         <div className="filter-panel">
           <input placeholder="Tìm áo dài, suit, cosplay..." value={filters.q} onChange={(e) => setFilters({ ...filters, q: e.target.value })} />
-          <select value={filters.category} onChange={(e) => setFilters({ ...filters, category: e.target.value })}>
+          <select value={filters.category} onChange={(e) => {
+            setFilters({ ...filters, category: e.target.value });
+            trackGAEvent(ANALYTICS_EVENTS.APPLY_FILTER, {
+              filter_name: 'category',
+              filter_value: e.target.value,
+              source: 'home_filter',
+            });
+          }}>
             <option value="">Tất cả danh mục</option>
             {categoriesList.map((c, idx) => (
               <option key={idx} value={c}>{c}</option>
             ))}
           </select>
-          <select value={filters.size} onChange={(e) => setFilters({ ...filters, size: e.target.value })}>
+          <select value={filters.size} onChange={(e) => {
+            setFilters({ ...filters, size: e.target.value });
+            trackGAEvent(ANALYTICS_EVENTS.APPLY_FILTER, {
+              filter_name: 'size',
+              filter_value: e.target.value,
+              source: 'home_filter',
+            });
+          }}>
             <option value="">Tất cả size</option>
             {sizesList.map((sz, idx) => (
               <option key={idx} value={sz}>{sz}</option>

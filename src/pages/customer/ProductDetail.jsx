@@ -5,6 +5,7 @@ import { createOrder } from '../../services/orders.js';
 import { getProduct } from '../../services/products.js';
 import { getProductReviews } from '../../services/reviews.js';
 import { trackEvent } from '../../hooks/useAnalytics.js';
+import { ANALYTICS_EVENTS, trackEvent as trackGAEvent } from '../../utils/analytics.js';
 import { useCart } from '../../hooks/useCart.js';
 import toast from 'react-hot-toast';
 import { Palette, Sparkles, Package, Ruler, Calendar, MessageSquare, Store, Lock, Diamond, Banknote, ClipboardCheck, ShieldCheck, PackageCheck, MessageCircle, CheckCircle, XCircle, MapPin } from 'lucide-react';
@@ -93,6 +94,12 @@ const ProductDetail = () => {
           : (item.size ? [item.size] : []);
       setForm((old) => ({ ...old, size: old.size || parsedSizes[0] || '' }));
       trackEvent('VIEW_PRODUCT', `Xem sản phẩm: ${item.name}`, { productId: item._id, productName: item.name });
+      trackGAEvent(ANALYTICS_EVENTS.VIEW_PRODUCT, {
+        product_id: item._id,
+        product_name: item.name,
+        category: item.category?.name || item.category?.slug || item.category,
+        price: item.rentalPrice,
+      });
     });
     getProductReviews(id).then(setReviews).catch(() => setReviews([]));
   }, [id]);
@@ -123,6 +130,14 @@ const ProductDetail = () => {
     setMessage({ text: '', type: '' });
     try {
       const result = await createOrder({ productId: id, ...form });
+      trackGAEvent(ANALYTICS_EVENTS.SUBMIT_BOOKING, {
+        product_id: product?._id || id,
+        product_name: product?.name,
+        rental_days: rentalDays,
+        value: costBreakdown?.total || 0,
+        currency: 'VND',
+        payment_method: form.paymentMethod,
+      });
       if (result.order?.payment?.checkoutUrl) {
         window.location.href = result.order.payment.checkoutUrl;
       } else {
@@ -163,6 +178,13 @@ const ProductDetail = () => {
       setMessage({ text: 'Vui lòng điền đầy đủ Địa chỉ và Số điện thoại.', type: 'error' });
       return;
     }
+    trackGAEvent(ANALYTICS_EVENTS.CLICK_RENT, {
+      product_id: product._id,
+      product_name: product.name,
+      rental_days: rentalDays,
+      value: costBreakdown?.total || 0,
+      currency: 'VND',
+    });
     setShowConfirmModal(true);
   };
 

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import ProductCard from '../../components/ProductCard.jsx';
 import { listProducts, listCategories, listSizes } from '../../services/products.js';
 import { trackEvent } from '../../hooks/useAnalytics.js';
+import { ANALYTICS_EVENTS, trackEvent as trackGAEvent } from '../../utils/analytics.js';
 
 const money = (value) => Number(value || 0).toLocaleString('vi-VN');
 
@@ -103,7 +104,22 @@ const Products = () => {
     }));
     if (searchQuery) {
       trackEvent('SEARCH', `Tìm kiếm từ khóa: ${searchQuery}`, { query: searchQuery, color: colorQuery });
+      trackGAEvent(ANALYTICS_EVENTS.SEARCH_PRODUCT, {
+        query: searchQuery,
+        color: colorQuery,
+        results_count: pagination.total,
+      });
     }
+    trackGAEvent(ANALYTICS_EVENTS.APPLY_FILTER, {
+      query: searchQuery,
+      category: filters.category,
+      size: filters.size,
+      color: colorQuery,
+      min_price: minPriceQuery,
+      max_price: maxPriceQuery,
+      shop_id: filters.shop,
+      sort: filters.sort,
+    });
   };
 
   const handleClearFilters = () => {
@@ -155,7 +171,14 @@ const Products = () => {
               <label style={{ fontWeight: '800', fontSize: '0.9rem', display: 'block', marginBottom: '5px' }}>Danh mục</label>
               <select 
                 value={filters.category} 
-                onChange={(e) => { setPage(1); setFilters({ ...filters, category: e.target.value }); }}
+                onChange={(e) => {
+                  setPage(1);
+                  setFilters({ ...filters, category: e.target.value });
+                  trackGAEvent(ANALYTICS_EVENTS.APPLY_FILTER, {
+                    filter_name: 'category',
+                    filter_value: e.target.value,
+                  });
+                }}
               >
                 <option value="">Tất cả danh mục</option>
                 {categories.map((c, idx) => (
@@ -168,7 +191,14 @@ const Products = () => {
               <label style={{ fontWeight: '800', fontSize: '0.9rem', display: 'block', marginBottom: '5px' }}>Size</label>
               <select 
                 value={filters.size} 
-                onChange={(e) => { setPage(1); setFilters({ ...filters, size: e.target.value }); }}
+                onChange={(e) => {
+                  setPage(1);
+                  setFilters({ ...filters, size: e.target.value });
+                  trackGAEvent(ANALYTICS_EVENTS.APPLY_FILTER, {
+                    filter_name: 'size',
+                    filter_value: e.target.value,
+                  });
+                }}
               >
                 <option value="">Tất cả size</option>
                 {sizesList.map((sz, idx) => (
@@ -208,7 +238,14 @@ const Products = () => {
               <label style={{ fontWeight: '800', fontSize: '0.9rem', display: 'block', marginBottom: '5px' }}>Cửa hàng (Shop)</label>
               <select 
                 value={filters.shop} 
-                onChange={(e) => { setPage(1); setFilters({ ...filters, shop: e.target.value }); }}
+                onChange={(e) => {
+                  setPage(1);
+                  setFilters({ ...filters, shop: e.target.value });
+                  trackGAEvent(ANALYTICS_EVENTS.APPLY_FILTER, {
+                    filter_name: 'shop',
+                    filter_value: e.target.value,
+                  });
+                }}
               >
                 <option value="">Tất cả các shop</option>
                 {shops.map((s) => <option key={s._id} value={s._id}>{s.fullName}</option>)}
@@ -234,7 +271,14 @@ const Products = () => {
               <span style={{ fontWeight: '800', color: 'var(--muted)', whiteSpace: 'nowrap' }}>Sắp xếp:</span>
               <select 
                 value={filters.sort} 
-                onChange={(e) => { setPage(1); setFilters({ ...filters, sort: e.target.value }); }}
+                onChange={(e) => {
+                  setPage(1);
+                  setFilters({ ...filters, sort: e.target.value });
+                  trackGAEvent(ANALYTICS_EVENTS.APPLY_FILTER, {
+                    filter_name: 'sort',
+                    filter_value: e.target.value,
+                  });
+                }}
                 style={{ width: '200px', background: 'var(--surface-soft)' }}
               >
                 <option value="newest">Mới nhất đầu tiên</option>

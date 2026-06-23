@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { askAi } from '../services/ai.js';
+import { ANALYTICS_EVENTS, trackEvent as trackGAEvent } from '../utils/analytics.js';
 
 const quickPrompts = ['Đi tiệc cưới mặc gì?', 'Tư vấn áo dài', 'Chọn size giúp tôi', 'Quy trình thuê đồ'];
 
@@ -33,6 +34,11 @@ const AiAssistant = () => {
 
   const ask = async (text) => {
     if (!text.trim() || loading) return;
+    trackGAEvent(ANALYTICS_EVENTS.CLICK_CHAT, {
+      source: 'ai_assistant',
+      message_length: text.trim().length,
+      prompt_type: quickPrompts.includes(text) ? 'quick_prompt' : 'custom',
+    });
     setMessages((items) => [...items, { role: 'user', text }]);
     setInput('');
     setLoading(true);

@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import api from '../../services/api.js';
 import { saveSession } from '../../services/auth.js';
+import { ANALYTICS_EVENTS, trackEvent as trackGAEvent } from '../../utils/analytics.js';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -22,6 +23,10 @@ const Register = () => {
       const response = await api.post('/auth/register', payload);
       const registeredUser = response.data.data.user;
       saveSession(registeredUser, response.data.data.accessToken);
+      trackGAEvent(ANALYTICS_EVENTS.SIGNUP, {
+        method: 'email',
+        user_role: registeredUser?.role || registeredUser?.roles?.[0] || 'renter',
+      });
 
       const isShop = ['lender', 'both'].includes(registeredUser?.role);
       navigate(registeredUser?.role === 'admin' ? '/admin' : isShop ? '/shop/dashboard' : '/');

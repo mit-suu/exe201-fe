@@ -5,6 +5,7 @@ import { Trash2, ShoppingBag, ArrowRight, Store } from 'lucide-react';
 import { getCurrentUser } from '../../services/auth.js';
 import { createOrder } from '../../services/orders.js';
 import toast from 'react-hot-toast';
+import { ANALYTICS_EVENTS, trackEvent as trackGAEvent } from '../../utils/analytics.js';
 
 const money = (value) => Number(value || 0).toLocaleString('vi-VN');
 
@@ -41,6 +42,12 @@ const Cart = () => {
           note: note
         });
       }
+      trackGAEvent(ANALYTICS_EVENTS.SUBMIT_BOOKING, {
+        items_count: cart.length,
+        value: totalCartValue,
+        currency: 'VND',
+        payment_method: paymentMethod,
+      });
       toast.success('Đặt hàng thành công!');
       clearCart();
       navigate('/orders');
